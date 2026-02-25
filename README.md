@@ -31,6 +31,14 @@ Polyscript brings dual subtitles, hover dictionary, AI-assisted translation, and
 
 If you install from GitHub, IINA can detect updates using plugin metadata (`ghRepo` + `ghVersion`).
 
+## Known Issue (IINA 1.4.1)
+
+On some machines, using `Plugins -> Reload Plugins` can crash IINA due to a host-side plugin reload race.
+
+Recommended workflow:
+- After install/update, restart IINA instead of using `Reload Plugins`.
+- If IINA crashes while reloading plugins, relaunch IINA and continue normally.
+
 ## Support
 
 - Website: [polyscript.app](https://polyscript.app)
