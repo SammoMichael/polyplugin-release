@@ -1,45 +1,35 @@
-# Polyscript for IINA
+# PolyPlugin Dev Modes
 
-Polyscript brings dual subtitles, hover dictionary, AI-assisted translation, and language learning workflows directly into IINA.
+## Local development
 
-## Install
+Use the dev symlink so IINA loads the plugin directly from this repo:
 
-### Option 1: Install from GitHub (recommended)
+```bash
+npm run dev:link
+npm run dev:watch
+```
 
-1. Open IINA.
-2. Go to `Preferences` -> `Plugins`.
-3. Click `Install from GitHub...`.
-4. Paste:
-   - `https://github.com/SammoMichael/polyplugin-release`
-5. Confirm installation.
+`dev:watch` rebuilds, syncs, and restarts IINA on changes.
 
-### Option 2: Install from package file
+## Release testing
 
-1. Download `polyscript-iina.iinaplgz` from this repository (or Releases).
-2. In IINA, go to `Preferences` -> `Plugins`.
-3. Click `Install from Package...`.
-4. Select the downloaded `.iinaplgz` file.
+Remove the local dev install before testing the GitHub-distributed plugin:
 
-## Features
+```bash
+npm run dev:unlink
+```
 
-- Dual subtitles with flexible layout controls
-- Hover dictionary for quick term lookup
-- AI translation workflow for subtitle lines
-- TTS and language-learning focused playback tools
+Then restart IINA, open `Preferences → Plugins`, choose `Install from GitHub...`, and paste one of:
 
-## Updates
+`https://github.com/SammoMichael/polyplugin-release`
 
-If you install from GitHub, IINA can detect updates using plugin metadata (`ghRepo` + `ghVersion`).
+IINA also accepts the GitHub URL path form:
 
-## Known Issue (IINA 1.4.1)
+`github.com/SammoMichael/polyplugin-release`
 
-On some machines, using `Plugins -> Reload Plugins` can crash IINA due to a host-side plugin reload race.
+IINA also accepts the shorthand repo path:
 
-Recommended workflow:
-- After install/update, restart IINA instead of using `Reload Plugins`.
-- If IINA crashes while reloading plugins, relaunch IINA and continue normally.
+`SammoMichael/polyplugin-release`
 
-## Support
-
-- Website: [polyscript.app](https://polyscript.app)
-- Email: support@polyscript.app
+This avoids false results where IINA is still loading the local source repo through
+`polyplugin.iinaplugin-dev`.
