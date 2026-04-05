@@ -498,6 +498,63 @@ input[type=range].ps-input::-webkit-slider-thumb {
   top: 0;
   z-index: 2;
 }
+.ps-transcript-display-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ps-transcript-display-label {
+  font-size: 11px;
+  color: var(--ps-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ps-transcript-switch {
+  border: 1px solid rgba(169, 188, 225, 0.2);
+  border-radius: 999px;
+  background: rgba(20, 31, 49, 0.55);
+  color: var(--ps-text);
+  padding: 5px 9px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.ps-transcript-switch.is-on {
+  border-color: rgba(95, 141, 255, 0.45);
+  background: rgba(95, 141, 255, 0.14);
+  color: #f4f8ff;
+}
+.ps-transcript-switch-track {
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(121, 143, 182, 0.35);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+.ps-transcript-switch.is-on .ps-transcript-switch-track {
+  background: rgba(95, 141, 255, 0.5);
+}
+.ps-transcript-switch-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #f5f8ff;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 120ms ease;
+}
+.ps-transcript-switch.is-on .ps-transcript-switch-thumb {
+  transform: translateX(12px);
+}
+.ps-transcript-switch-label {
+  font-family: var(--ps-sidebar-font);
+}
 .ps-transcript-filter-info {
   display: flex;
   align-items: center;
@@ -593,12 +650,26 @@ input[type=range].ps-input::-webkit-slider-thumb {
   cursor: pointer;
   transition: color 120ms ease;
 }
+.ps-transcript-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+}
 .ps-transcript-text:hover {
   color: var(--ps-accent-2);
 }
 .ps-transcript-line.is-active .ps-transcript-text {
   color: #ffffff;
   font-weight: 500;
+}
+.ps-transcript-original {
+  font-size: 11px;
+  color: var(--ps-muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 .ps-transcript-empty {
   padding: 24px 12px;

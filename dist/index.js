@@ -90,6 +90,9 @@
   var renderScheduled = false;
   var currentTranslateJobId = 0;
   var originalSubPositions = { captured: false, primary: null, secondary: null };
+  var originalSubVisibility = { captured: false, primary: null, secondary: null };
+  var originalPrimarySubStyle = { captured: false, color: null, outlineColor: null, backColor: null, outlineSize: null };
+  var lastNativeSubtitleSuppressionMode = "none";
   var lastHoverWord = "";
   var lastHoverLine = "";
   var lastOverlayInteractionAt = 0;
@@ -122,9 +125,10 @@
   var VOICE_CACHE_TTL_MS = 5 * 60 * 1e3;
   var ENTITLEMENT_CACHE_TTL_MS = 60 * 1e3;
   var PERSONAL_VOICE_TOKEN = "__personal__";
-  var VOICE_SELECTOR_SYSTEM = "system";
-  var VOICE_SELECTOR_CLOUD = "cloud";
   var VOICE_SELECTOR_PERSONAL = "personal";
+  var VOICE_CHOICE_AUTO = "auto";
+  var VOICE_CHOICE_SYSTEM_PREFIX = "system:";
+  var VOICE_CHOICE_CLOUD_PREFIX = "cloud:";
   var SIDEBAR_VOICE_REFRESH_COOLDOWN_MS = 10 * 1e3;
   var sidebarVoiceRefreshPromise = null;
   var sidebarVoiceRefreshAt = 0;
@@ -144,6 +148,7 @@
   var sourceTrackAutoSelectedForFile = false;
   var sourceTrackSelectionAttempts = 0;
   var lastSourceTrackSelectionAttemptAt = 0;
+  var lastSourceSubId = null;
   var lastMissingLoginOsdAt = 0;
   var lastSessionExpiredOsdAt = 0;
   var autoPickSourceSubtitlesEnabled = (() => {
@@ -159,6 +164,17 @@
   var autoArrangeSubsSetting = (() => {
     var _a4;
     const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "autoArrangeSubs");
+    return coerceBoolean(raw, false);
+  })();
+  var hideNativeSubtitleRendering = true;
+  var showSourceSubtitles = (() => {
+    var _a4;
+    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "showSourceSubtitles");
+    return coerceBoolean(raw, false);
+  })();
+  var showOriginalTranscript = (() => {
+    var _a4;
+    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "showOriginalTranscript");
     return coerceBoolean(raw, false);
   })();
   var primarySubPositionSetting = (() => {
@@ -357,7 +373,27 @@
       ttsOnPause: coerceBoolean(raw.ttsOnPause, false)
     };
   }
+  function resolveExistingPath(pathValue) {
+    const raw = String(pathValue || "").trim();
+    if (!raw) return "";
+    const resolved = typeof (utils == null ? void 0 : utils.resolvePath) === "function" ? utils.resolvePath(raw) : raw;
+    if ((file == null ? void 0 : file.exists) && !file.exists(resolved)) return "";
+    return resolved;
+  }
+  function resolveBundledNativeHelperPath() {
+    const candidates = [
+      "dist/native/PolyscriptTTSHelper",
+      "native/PolyscriptTTSHelper/.build/release/PolyscriptTTSHelper",
+      "native/PolyscriptTTSHelper/.build/debug/PolyscriptTTSHelper"
+    ];
+    for (const candidate of candidates) {
+      const resolved = resolveExistingPath(candidate);
+      if (resolved) return resolved;
+    }
+    return "";
+  }
   function normalizeTtsSettings(raw = {}) {
+    const configuredNativeHelperPath = resolveExistingPath(raw.nativeHelperPath);
     return {
       enabled: coerceBoolean(raw.enabled, true),
       wordClick: coerceBoolean(raw.wordClick, true),
@@ -367,7 +403,7 @@
       autoVoice: coerceBoolean(raw.autoVoice, false),
       engine: raw.engine === "native" ? "native" : raw.engine === "cloud" ? "cloud" : "say",
       nativeBaseUrl: normalizeServiceBaseUrl(raw.nativeBaseUrl, DEFAULT_NATIVE_BASE_URL),
-      nativeHelperPath: typeof raw.nativeHelperPath === "string" ? raw.nativeHelperPath : "",
+      nativeHelperPath: configuredNativeHelperPath || resolveBundledNativeHelperPath(),
       nativeAutoStart: coerceBoolean(raw.nativeAutoStart, true),
       preferPersonal: coerceBoolean(raw.preferPersonal, true),
       nativeEngine: raw.nativeEngine === "av" ? "av" : "nss",
@@ -421,11 +457,7 @@
     const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "autoLoadSubtitles");
     return coerceBoolean(raw, false);
   })();
-  var useNativeSubsWhenAvailable = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "useNativeSubsWhenAvailable");
-    return coerceBoolean(raw, true);
-  })();
+  var useNativeSubsWhenAvailable = true;
   var usingNativeTargetSubs = false;
   function updatePreferenceCachesOnSet(key, value) {
     switch (key) {
@@ -531,8 +563,11 @@
       case "autoPickSourceSubtitles":
         autoPickSourceSubtitlesEnabled = coerceBoolean(value, autoPickSourceSubtitlesEnabled);
         return;
-      case "useNativeSubsWhenAvailable":
-        useNativeSubsWhenAvailable = coerceBoolean(value, useNativeSubsWhenAvailable);
+      case "showOriginalTranscript":
+        showOriginalTranscript = coerceBoolean(value, showOriginalTranscript);
+        return;
+      case "showSourceSubtitles":
+        showSourceSubtitles = coerceBoolean(value, showSourceSubtitles);
         return;
       default:
         return;
@@ -924,6 +959,9 @@
       llmMaxTokens,
       sentenceMode,
       polyscriptEnabled,
+      hideNativeSubtitleRendering,
+      showSourceSubtitles,
+      showOriginalTranscript,
       autoArrangeSubs: autoArrangeSubsSetting,
       primarySubPosition: primarySubPositionSetting,
       secondarySubPosition: secondarySubPositionSetting,
@@ -932,7 +970,7 @@
     };
   }
   function applySettingsSnapshot(snapshot) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     if (!snapshot || typeof snapshot !== "object") return;
     const nextTarget = snapshot.targetLang;
     if (nextTarget && GOOGLE_TRANSLATE_LANGS[nextTarget]) {
@@ -981,36 +1019,47 @@
       polyscriptEnabled = snapshot.polyscriptEnabled;
       (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "polyscriptEnabled", polyscriptEnabled);
     }
+    hideNativeSubtitleRendering = true;
+    (_l = preferences == null ? void 0 : preferences.set) == null ? void 0 : _l.call(preferences, "hideNativeSubtitleRendering", true);
+    if (typeof snapshot.showSourceSubtitles === "boolean") {
+      showSourceSubtitles = snapshot.showSourceSubtitles;
+      (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "showSourceSubtitles", showSourceSubtitles);
+    }
+    if (typeof snapshot.showOriginalTranscript === "boolean") {
+      showOriginalTranscript = snapshot.showOriginalTranscript;
+      (_n = preferences == null ? void 0 : preferences.set) == null ? void 0 : _n.call(preferences, "showOriginalTranscript", showOriginalTranscript);
+    }
     if (typeof snapshot.autoArrangeSubs === "boolean") {
       autoArrangeSubsSetting = snapshot.autoArrangeSubs;
-      (_l = preferences == null ? void 0 : preferences.set) == null ? void 0 : _l.call(preferences, "autoArrangeSubs", snapshot.autoArrangeSubs);
+      (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "autoArrangeSubs", snapshot.autoArrangeSubs);
     }
     if (typeof snapshot.primarySubPosition === "string") {
       primarySubPositionSetting = snapshot.primarySubPosition === "top" ? "top" : "bottom";
-      (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "primarySubPosition", snapshot.primarySubPosition);
+      (_p = preferences == null ? void 0 : preferences.set) == null ? void 0 : _p.call(preferences, "primarySubPosition", snapshot.primarySubPosition);
     }
     if (typeof snapshot.secondarySubPosition === "string") {
       secondarySubPositionSetting = snapshot.secondarySubPosition === "top" ? "top" : "bottom";
-      (_n = preferences == null ? void 0 : preferences.set) == null ? void 0 : _n.call(preferences, "secondarySubPosition", snapshot.secondarySubPosition);
+      (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "secondarySubPosition", snapshot.secondarySubPosition);
     }
     if (typeof snapshot.segmentationEnabled === "boolean") {
       segmentationEnabledSetting = snapshot.segmentationEnabled;
-      (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "segmentationEnabled", snapshot.segmentationEnabled);
+      (_r = preferences == null ? void 0 : preferences.set) == null ? void 0 : _r.call(preferences, "segmentationEnabled", snapshot.segmentationEnabled);
     }
     if (snapshot.appearance && typeof snapshot.appearance === "object") {
       const app = snapshot.appearance;
-      if (app.fontSize) (_p = preferences == null ? void 0 : preferences.set) == null ? void 0 : _p.call(preferences, "overlayFontSize", app.fontSize);
-      if (app.bgColor) (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "overlayBgColor", app.bgColor);
-      if (typeof app.bgOpacity === "number") (_r = preferences == null ? void 0 : preferences.set) == null ? void 0 : _r.call(preferences, "overlayBgOpacity", app.bgOpacity);
-      if (app.textColor) (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "overlayTextColor", app.textColor);
-      if (typeof app.showTranslit === "boolean") (_t = preferences == null ? void 0 : preferences.set) == null ? void 0 : _t.call(preferences, "showTransliteration", app.showTranslit);
-      if (app.placement) (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "overlayPlacement", app.placement);
-      if (typeof app.customOffset === "number") (_v = preferences == null ? void 0 : preferences.set) == null ? void 0 : _v.call(preferences, "overlayCustomOffset", app.customOffset);
-      if (app.overlayDock) (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "overlayDock", app.overlayDock);
+      if (app.fontSize) (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "overlayFontSize", app.fontSize);
+      if (app.bgColor) (_t = preferences == null ? void 0 : preferences.set) == null ? void 0 : _t.call(preferences, "overlayBgColor", app.bgColor);
+      if (typeof app.bgOpacity === "number") (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "overlayBgOpacity", app.bgOpacity);
+      if (app.textColor) (_v = preferences == null ? void 0 : preferences.set) == null ? void 0 : _v.call(preferences, "overlayTextColor", app.textColor);
+      if (typeof app.showTranslit === "boolean") (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "showTransliteration", app.showTranslit);
+      if (app.placement) (_x = preferences == null ? void 0 : preferences.set) == null ? void 0 : _x.call(preferences, "overlayPlacement", app.placement);
+      if (typeof app.customOffset === "number") (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "overlayCustomOffset", app.customOffset);
+      if (app.overlayDock) (_z = preferences == null ? void 0 : preferences.set) == null ? void 0 : _z.call(preferences, "overlayDock", app.overlayDock);
     }
-    (_x = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _x.call(preferences);
+    (_A = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _A.call(preferences);
     appearanceSettingsCache = null;
     applyAppearanceSettings();
+    syncNativeSubtitleVisibility();
     clearTranslationCaches();
     usingFullFileTranslation = false;
     subtitleEntries = null;
@@ -1335,11 +1384,16 @@
     if (autoArrangeSubsSetting) {
       return base;
     }
+    if (shouldHideNativeSubtitleRendering() || shouldUseTransparentPrimarySuppression()) {
+      return base;
+    }
     let hasBuiltInSubs = false;
     try {
       const subText = typeof mpv.getString === "function" ? mpv.getString("sub-text") : "";
       const secText = typeof mpv.getString === "function" ? mpv.getString("secondary-sub-text") : "";
-      hasBuiltInSubs = !!(subText && subText.trim()) || !!(secText && secText.trim());
+      const primaryVisible = safeGetBoolean("sub-visibility");
+      const secondaryVisible = safeGetBoolean("secondary-sub-visibility");
+      hasBuiltInSubs = primaryVisible !== false && !!(subText && subText.trim()) || secondaryVisible !== false && !!(secText && secText.trim());
     } catch {
     }
     return base + (hasBuiltInSubs ? 80 : 0);
@@ -1362,10 +1416,66 @@
     }
     return null;
   }
+  function safeGetBoolean(prop) {
+    try {
+      if (typeof mpv.getFlag === "function") {
+        const val = mpv.getFlag(prop);
+        if (typeof val === "boolean") return val;
+      }
+    } catch {
+    }
+    try {
+      if (typeof mpv.getString === "function") {
+        const raw = mpv.getString(prop);
+        if (typeof raw === "string" && raw.trim()) {
+          return coerceBoolean(raw, null);
+        }
+      }
+    } catch {
+    }
+    return null;
+  }
+  function safeGetString(prop) {
+    try {
+      if (typeof mpv.getString === "function") {
+        const raw = mpv.getString(prop);
+        return typeof raw === "string" && raw.length ? raw : null;
+      }
+    } catch {
+    }
+    return null;
+  }
   function safeSetNumber(prop, value) {
     try {
       if (typeof mpv.set === "function") {
         mpv.set(prop, value);
+        return true;
+      }
+    } catch {
+    }
+    return false;
+  }
+  function safeSetString(prop, value) {
+    try {
+      if (typeof mpv.set === "function") {
+        mpv.set(prop, value);
+        return true;
+      }
+    } catch {
+    }
+    return false;
+  }
+  function safeSetBoolean(prop, value) {
+    try {
+      if (typeof mpv.set === "function") {
+        mpv.set(prop, value ? "yes" : "no");
+        return true;
+      }
+    } catch {
+    }
+    try {
+      if (typeof mpv.set === "function") {
+        mpv.set(prop, !!value);
         return true;
       }
     } catch {
@@ -1394,6 +1504,137 @@
     if (originalSubPositions.secondary != null) {
       setSecondarySubPos(originalSubPositions.secondary);
     }
+  }
+  function captureSubVisibility() {
+    if (originalSubVisibility.captured) return;
+    originalSubVisibility.primary = safeGetBoolean("sub-visibility");
+    originalSubVisibility.secondary = safeGetBoolean("secondary-sub-visibility");
+    originalSubVisibility.captured = true;
+  }
+  function restoreSubVisibility() {
+    if (originalSubVisibility.captured) {
+      safeSetBoolean("sub-visibility", originalSubVisibility.primary !== false);
+      safeSetBoolean("secondary-sub-visibility", originalSubVisibility.secondary !== false);
+      return;
+    }
+    safeSetBoolean("sub-visibility", true);
+    safeSetBoolean("secondary-sub-visibility", true);
+  }
+  function capturePrimarySubStyle() {
+    if (originalPrimarySubStyle.captured) return;
+    originalPrimarySubStyle.color = safeGetString("sub-color");
+    originalPrimarySubStyle.outlineColor = safeGetString("sub-outline-color") || safeGetString("sub-border-color");
+    originalPrimarySubStyle.backColor = safeGetString("sub-back-color") || safeGetString("sub-shadow-color");
+    originalPrimarySubStyle.outlineSize = safeGetNumber("sub-outline-size");
+    if (originalPrimarySubStyle.outlineSize == null) {
+      originalPrimarySubStyle.outlineSize = safeGetNumber("sub-border-size");
+    }
+    originalPrimarySubStyle.captured = true;
+  }
+  function restorePrimarySubStyle() {
+    if (!originalPrimarySubStyle.captured) return;
+    if (originalPrimarySubStyle.color != null) {
+      safeSetString("sub-color", originalPrimarySubStyle.color);
+    }
+    if (originalPrimarySubStyle.outlineColor != null) {
+      safeSetString("sub-outline-color", originalPrimarySubStyle.outlineColor);
+      safeSetString("sub-border-color", originalPrimarySubStyle.outlineColor);
+    }
+    if (originalPrimarySubStyle.backColor != null) {
+      safeSetString("sub-back-color", originalPrimarySubStyle.backColor);
+      safeSetString("sub-shadow-color", originalPrimarySubStyle.backColor);
+    }
+    if (originalPrimarySubStyle.outlineSize != null) {
+      safeSetNumber("sub-outline-size", originalPrimarySubStyle.outlineSize);
+      safeSetNumber("sub-border-size", originalPrimarySubStyle.outlineSize);
+    }
+  }
+  function setSecondarySubtitleTrack(id) {
+    try {
+      if (id == null || id === "no") {
+        mpv.set("secondary-sid", "no");
+      } else {
+        mpv.set("secondary-sid", id);
+      }
+      return true;
+    } catch {
+    }
+    return false;
+  }
+  function pickSecondarySourceTrack(excludedTrackId = null) {
+    const tracks = listSubtitleTracks().filter((track) => track.id !== excludedTrackId);
+    const candidate = pickBestSourceSubtitleTrack(tracks);
+    return candidate && typeof candidate.id === "number" ? candidate : null;
+  }
+  function syncSourceSubtitleTrack() {
+    const shouldShowSource = polyscriptEnabled && showSourceSubtitles && (usingFullFileTranslation || usingNativeTargetSubs);
+    if (!shouldShowSource) {
+      setSecondarySubtitleTrack("no");
+      safeSetBoolean("secondary-sub-visibility", false);
+      return;
+    }
+    const primaryTrack = getSelectedSubTrack();
+    const primaryId = primaryTrack && typeof primaryTrack.id === "number" ? primaryTrack.id : null;
+    let desiredSecondaryId = null;
+    if (lastSourceSubId != null && lastSourceSubId !== primaryId) {
+      desiredSecondaryId = lastSourceSubId;
+    } else {
+      const candidate = pickSecondarySourceTrack(primaryId);
+      if (candidate) {
+        desiredSecondaryId = candidate.id;
+        lastSourceSubId = candidate.id;
+      }
+    }
+    if (desiredSecondaryId == null) {
+      setSecondarySubtitleTrack("no");
+      safeSetBoolean("secondary-sub-visibility", false);
+      return;
+    }
+    setSecondarySubtitleTrack(desiredSecondaryId);
+    safeSetBoolean("secondary-sub-visibility", true);
+  }
+  function shouldHideNativeSubtitleRendering() {
+    return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && (usingFullFileTranslation && !!(subtitleEntries == null ? void 0 : subtitleEntries.length) || usingNativeTargetSubs && !!(subtitleEntries == null ? void 0 : subtitleEntries.length));
+  }
+  function shouldUseTransparentPrimarySuppression() {
+    return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && !showSourceSubtitles && (usingNativeTargetSubs && !(subtitleEntries == null ? void 0 : subtitleEntries.length) || !usingNativeTargetSubs && !usingFullFileTranslation);
+  }
+  function syncNativeSubtitleVisibility() {
+    if (shouldHideNativeSubtitleRendering()) {
+      if (lastNativeSubtitleSuppressionMode !== "visibility") {
+        console.log("POLYSCRIPT: Native subtitle suppression mode=visibility");
+        lastNativeSubtitleSuppressionMode = "visibility";
+      }
+      restorePrimarySubStyle();
+      captureSubVisibility();
+      safeSetBoolean("sub-visibility", false);
+      syncSourceSubtitleTrack();
+      return;
+    }
+    if (shouldUseTransparentPrimarySuppression()) {
+      if (lastNativeSubtitleSuppressionMode !== "transparent-primary") {
+        console.log("POLYSCRIPT: Native subtitle suppression mode=transparent-primary");
+        lastNativeSubtitleSuppressionMode = "transparent-primary";
+      }
+      restoreSubVisibility();
+      capturePrimarySubStyle();
+      safeSetString("sub-color", "1/1/1/0");
+      safeSetString("sub-outline-color", "0/0/0/0");
+      safeSetString("sub-border-color", "0/0/0/0");
+      safeSetString("sub-back-color", "0/0/0/0");
+      safeSetString("sub-shadow-color", "0/0/0/0");
+      safeSetNumber("sub-outline-size", 0);
+      safeSetNumber("sub-border-size", 0);
+      syncSourceSubtitleTrack();
+      return;
+    }
+    if (lastNativeSubtitleSuppressionMode !== "none") {
+      console.log("POLYSCRIPT: Native subtitle suppression mode=none");
+      lastNativeSubtitleSuppressionMode = "none";
+    }
+    restoreSubVisibility();
+    restorePrimarySubStyle();
+    syncSourceSubtitleTrack();
   }
   function applySubtitleLayout() {
     const autoArrange = autoArrangeSubsSetting;
@@ -1517,76 +1758,140 @@
       return voiceLang === norm || voiceLang.split("-")[0] === base;
     });
   }
+  function encodeVoiceChoice(value, prefix) {
+    return `${prefix}${encodeURIComponent(String(value || "").trim())}`;
+  }
+  function decodeVoiceChoice(rawValue, prefix) {
+    const text = String(rawValue || "");
+    if (!text.startsWith(prefix)) return "";
+    return decodeURIComponent(text.slice(prefix.length));
+  }
   function buildVoiceSelectorState() {
-    var _a4;
     const settings = getTtsSettings();
     const mappedVoice = getMappedVoiceForCurrentTarget();
     const langCode = getAutoVoiceLangCode();
     const personalAvailable = hasPersonalVoiceForLanguage(langCode);
     const cloudAvailable = !!polyscriptToken;
-    const cloudVoiceOptions = Array.isArray(cloudVoices) ? cloudVoices.map((voice) => String((voice == null ? void 0 : voice.name) || "").trim()).filter((name) => name).map((name) => ({ value: name, label: name })) : [];
-    const options = [{ value: VOICE_SELECTOR_SYSTEM, label: "System Voice" }];
-    if (cloudAvailable) {
-      options.push({ value: VOICE_SELECTOR_CLOUD, label: "Cloud Voice" });
-    }
+    const systemVoiceOptions = filterVoicesByLang(cachedVoices, langCode).map((voice, index) => {
+      const name = String((voice == null ? void 0 : voice.name) || "").trim();
+      if (!name) return null;
+      const locale = String((voice == null ? void 0 : voice.locale) || "").trim().toUpperCase();
+      const badge = index === 0 ? "Recommended" : "System";
+      return {
+        value: encodeVoiceChoice(name, VOICE_CHOICE_SYSTEM_PREFIX),
+        label: locale ? `${name} (${badge}, ${locale})` : `${name} (${badge})`,
+        group: "System voices"
+      };
+    }).filter(Boolean);
+    const cloudVoiceOptions = Array.isArray(cloudVoices) ? cloudVoices.map((voice) => String((voice == null ? void 0 : voice.name) || "").trim()).filter((name) => name).map((name) => ({
+      value: encodeVoiceChoice(name, VOICE_CHOICE_CLOUD_PREFIX),
+      label: name,
+      group: "Polyscript voices"
+    })) : [];
+    const options = [{ value: VOICE_CHOICE_AUTO, label: "Auto voice (best available)" }];
+    options.push(...cloudVoiceOptions);
+    options.push(...systemVoiceOptions);
     if (personalAvailable) {
-      options.push({ value: VOICE_SELECTOR_PERSONAL, label: "Personal Voice" });
+      options.push({ value: VOICE_SELECTOR_PERSONAL, label: "Mac Personal Voice", group: "System voices" });
     }
-    let value = VOICE_SELECTOR_SYSTEM;
+    let value = VOICE_CHOICE_AUTO;
     if (settings.engine === "cloud" && cloudAvailable) {
-      value = VOICE_SELECTOR_CLOUD;
+      const selectedCloudVoice = String(mappedVoice || settings.voice || "").trim();
+      value = selectedCloudVoice ? encodeVoiceChoice(selectedCloudVoice, VOICE_CHOICE_CLOUD_PREFIX) : VOICE_CHOICE_AUTO;
     } else if (mappedVoice === PERSONAL_VOICE_TOKEN || settings.engine === "native" && personalAvailable) {
       value = VOICE_SELECTOR_PERSONAL;
+    } else {
+      const resolvedSystemVoice = String(mappedVoice || settings.voice || "").trim();
+      if (resolvedSystemVoice) {
+        value = encodeVoiceChoice(resolvedSystemVoice, VOICE_CHOICE_SYSTEM_PREFIX);
+      }
+    }
+    const hasValue = options.some((option) => option.value === value);
+    if (!hasValue && value.startsWith(VOICE_CHOICE_SYSTEM_PREFIX)) {
+      const saved = decodeVoiceChoice(value, VOICE_CHOICE_SYSTEM_PREFIX);
+      options.push({
+        value,
+        label: `${saved || "Saved voice"} (saved system voice)`,
+        group: "System voices"
+      });
+    } else if (!hasValue && value.startsWith(VOICE_CHOICE_CLOUD_PREFIX)) {
+      const saved = decodeVoiceChoice(value, VOICE_CHOICE_CLOUD_PREFIX);
+      options.push({
+        value,
+        label: `${saved || "Saved voice"} (saved cloud voice)`,
+        group: "Polyscript voices"
+      });
     }
     return {
       value,
       options,
       personalAvailable,
       cloudAvailable,
-      cloudVoiceOptions,
-      selectedCloudVoice: value === VOICE_SELECTOR_CLOUD ? String(mappedVoice || settings.voice || ((_a4 = cloudVoiceOptions[0]) == null ? void 0 : _a4.value) || "").trim() : "",
       targetLabel: getVoicePreferenceLabel(getVoicePreferenceKey())
     };
   }
   function applyVoiceSelectorChoice(rawValue) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D;
     const value = String(rawValue || "").trim();
     if (!value) return;
+    if (value === VOICE_CHOICE_AUTO) {
+      (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEnabled", true);
+      (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsEngine", "say");
+      (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "ttsAutoVoice", true);
+      (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "ttsPreferPersonal", false);
+      (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "ttsVoice", "");
+      setMappedVoiceForCurrentTarget("");
+      (_f = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _f.call(preferences);
+      buildMenu();
+      return;
+    }
     if (value === VOICE_SELECTOR_PERSONAL) {
       const langCode = getAutoVoiceLangCode();
       if (!hasPersonalVoiceForLanguage(langCode)) {
         core.osd("POLYSCRIPT: Personal Voice unavailable for this language", 1800);
         return;
       }
-      (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEnabled", true);
-      (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsEngine", "native");
-      (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "ttsAutoVoice", true);
-      (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "ttsPreferPersonal", true);
-      (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "ttsVoice", "");
+      (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "ttsEnabled", true);
+      (_h = preferences == null ? void 0 : preferences.set) == null ? void 0 : _h.call(preferences, "ttsEngine", "native");
+      (_i = preferences == null ? void 0 : preferences.set) == null ? void 0 : _i.call(preferences, "ttsAutoVoice", true);
+      (_j = preferences == null ? void 0 : preferences.set) == null ? void 0 : _j.call(preferences, "ttsPreferPersonal", true);
+      (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "ttsVoice", "");
       setMappedVoiceForCurrentTarget(PERSONAL_VOICE_TOKEN);
-      (_f = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _f.call(preferences);
-      buildMenu();
-      return;
-    }
-    if (value === VOICE_SELECTOR_CLOUD) {
-      const settings = getTtsSettings();
-      const mappedVoice = getMappedVoiceForCurrentTarget();
-      const fallbackVoice = String(mappedVoice || settings.voice || ((_g = cloudVoices[0]) == null ? void 0 : _g.name) || "").trim();
-      (_h = preferences == null ? void 0 : preferences.set) == null ? void 0 : _h.call(preferences, "ttsEnabled", true);
-      (_i = preferences == null ? void 0 : preferences.set) == null ? void 0 : _i.call(preferences, "ttsEngine", "cloud");
-      (_j = preferences == null ? void 0 : preferences.set) == null ? void 0 : _j.call(preferences, "ttsAutoVoice", false);
-      (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "ttsVoice", fallbackVoice);
-      setMappedVoiceForCurrentTarget(fallbackVoice);
       (_l = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _l.call(preferences);
       buildMenu();
       return;
     }
-    (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "ttsEnabled", true);
-    (_n = preferences == null ? void 0 : preferences.set) == null ? void 0 : _n.call(preferences, "ttsEngine", "say");
-    (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "ttsAutoVoice", true);
-    (_p = preferences == null ? void 0 : preferences.set) == null ? void 0 : _p.call(preferences, "ttsVoice", "");
+    const selectedCloudVoice = decodeVoiceChoice(value, VOICE_CHOICE_CLOUD_PREFIX);
+    if (selectedCloudVoice) {
+      (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "ttsEnabled", true);
+      (_n = preferences == null ? void 0 : preferences.set) == null ? void 0 : _n.call(preferences, "ttsEngine", "cloud");
+      (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "ttsAutoVoice", false);
+      (_p = preferences == null ? void 0 : preferences.set) == null ? void 0 : _p.call(preferences, "ttsPreferPersonal", false);
+      (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "ttsVoice", selectedCloudVoice);
+      setMappedVoiceForCurrentTarget(selectedCloudVoice);
+      (_r = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _r.call(preferences);
+      buildMenu();
+      return;
+    }
+    const selectedSystemVoice = decodeVoiceChoice(value, VOICE_CHOICE_SYSTEM_PREFIX);
+    if (selectedSystemVoice) {
+      (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "ttsEnabled", true);
+      (_t = preferences == null ? void 0 : preferences.set) == null ? void 0 : _t.call(preferences, "ttsEngine", "say");
+      (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "ttsAutoVoice", false);
+      (_v = preferences == null ? void 0 : preferences.set) == null ? void 0 : _v.call(preferences, "ttsPreferPersonal", false);
+      (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "ttsVoice", selectedSystemVoice);
+      setMappedVoiceForCurrentTarget(selectedSystemVoice);
+      (_x = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _x.call(preferences);
+      buildMenu();
+      return;
+    }
+    (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "ttsEnabled", true);
+    (_z = preferences == null ? void 0 : preferences.set) == null ? void 0 : _z.call(preferences, "ttsEngine", "say");
+    (_A = preferences == null ? void 0 : preferences.set) == null ? void 0 : _A.call(preferences, "ttsAutoVoice", true);
+    (_B = preferences == null ? void 0 : preferences.set) == null ? void 0 : _B.call(preferences, "ttsVoice", "");
+    (_C = preferences == null ? void 0 : preferences.set) == null ? void 0 : _C.call(preferences, "ttsPreferPersonal", false);
     setMappedVoiceForCurrentTarget("");
-    (_q = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _q.call(preferences);
+    (_D = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _D.call(preferences);
     buildMenu();
   }
   function parseSayVoices(stdout) {
@@ -3355,8 +3660,9 @@ ws.onmessage = (event) => {
       if (nativeOk) return;
       settings = normalizeTtsSettings({ ...settings, engine: "say", autoVoice: true });
     }
-    const autoSystemVoice = pickVoiceForLang(ttsLang.langCode);
-    if (!autoSystemVoice) {
+    const resolvedVoice = resolveTtsVoiceForCurrentLang();
+    const autoSystemVoice = settings.autoVoice ? pickVoiceForLang(ttsLang.langCode) : "";
+    if (!resolvedVoice && !autoSystemVoice) {
       maybeShowTtsUnsupportedNotice(ttsLang);
       return;
     }
@@ -3372,9 +3678,9 @@ ws.onmessage = (event) => {
         core.osd(`POLYSCRIPT: Speaking "${clean.slice(0, 24)}"`, 1200);
       }
       const args = [];
-      const resolvedVoice = autoSystemVoice || resolveTtsVoiceForCurrentLang();
-      if (resolvedVoice) {
-        args.push("-v", resolvedVoice);
+      const selectedVoice = resolvedVoice || autoSystemVoice;
+      if (selectedVoice) {
+        args.push("-v", selectedVoice);
       }
       if (settings.rate) {
         args.push("-r", String(settings.rate));
@@ -3537,6 +3843,7 @@ ws.onmessage = (event) => {
         mpv.set("secondary-sid", "no");
       } catch {
       }
+      syncNativeSubtitleVisibility();
       try {
         (_c = overlay == null ? void 0 : overlay.setOpacity) == null ? void 0 : _c.call(overlay, 0);
         (_d = overlay == null ? void 0 : overlay.hide) == null ? void 0 : _d.call(overlay);
@@ -3546,6 +3853,7 @@ ws.onmessage = (event) => {
       ensureOverlayLoaded();
       (_e = overlay == null ? void 0 : overlay.show) == null ? void 0 : _e.call(overlay);
       (_f = overlay == null ? void 0 : overlay.setOpacity) == null ? void 0 : _f.call(overlay, 1);
+      syncNativeSubtitleVisibility();
       translateCurrentSubtitleFile();
     }
     core.osd(`POLYSCRIPT: Subtitles ${polyscriptEnabled ? "On" : "Off"}`, 1500);
@@ -3590,7 +3898,8 @@ ws.onmessage = (event) => {
       polyscriptEnabled,
       appearance,
       segmentationEnabled: isSegmentationEnabled(),
-      useNativeSubsWhenAvailable,
+      showSourceSubtitles,
+      showOriginalTranscript,
       autoArrangeSubs: autoArrangeSubsSetting,
       primarySubPosition: primarySubPositionSetting,
       secondarySubPosition: secondarySubPositionSetting,
@@ -3655,7 +3964,7 @@ ws.onmessage = (event) => {
     return changed;
   }
   function applySidebarSetting(key, value) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$;
+    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da;
     switch (key) {
       case "targetLang":
         setTargetLang(value);
@@ -3807,85 +4116,100 @@ ws.onmessage = (event) => {
         (_v = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _v.call(preferences);
         if (lastRenderedText) scheduleRender(lastRenderedText);
         return;
-      case "useNativeSubsWhenAvailable":
-        useNativeSubsWhenAvailable = coerceBoolean(value, useNativeSubsWhenAvailable);
-        (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "useNativeSubsWhenAvailable", useNativeSubsWhenAvailable);
+      case "hideNativeSubtitleRendering":
+        hideNativeSubtitleRendering = true;
+        (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "hideNativeSubtitleRendering", true);
         (_x = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _x.call(preferences);
+        syncNativeSubtitleVisibility();
+        buildMenu();
+        return;
+      case "showSourceSubtitles":
+        showSourceSubtitles = coerceBoolean(value, showSourceSubtitles);
+        (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "showSourceSubtitles", showSourceSubtitles);
+        (_z = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _z.call(preferences);
+        syncNativeSubtitleVisibility();
+        emitSidebarSettings({ skipAutoAiRefresh: true });
+        return;
+      case "showOriginalTranscript":
+        showOriginalTranscript = coerceBoolean(value, showOriginalTranscript);
+        (_A = preferences == null ? void 0 : preferences.set) == null ? void 0 : _A.call(preferences, "showOriginalTranscript", showOriginalTranscript);
+        (_B = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _B.call(preferences);
+        emitSidebarSettings({ skipAutoAiRefresh: true });
         return;
       case "autoArrangeSubs":
         autoArrangeSubsSetting = coerceBoolean(value, autoArrangeSubsSetting);
-        (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "autoArrangeSubs", autoArrangeSubsSetting);
-        (_z = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _z.call(preferences);
+        (_C = preferences == null ? void 0 : preferences.set) == null ? void 0 : _C.call(preferences, "autoArrangeSubs", autoArrangeSubsSetting);
+        (_D = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _D.call(preferences);
         applySubtitleLayout();
         return;
       case "primarySubPosition":
         primarySubPositionSetting = value === "top" ? "top" : "bottom";
-        (_A = preferences == null ? void 0 : preferences.set) == null ? void 0 : _A.call(preferences, "primarySubPosition", value === "top" ? "top" : "bottom");
-        (_B = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _B.call(preferences);
+        (_E = preferences == null ? void 0 : preferences.set) == null ? void 0 : _E.call(preferences, "primarySubPosition", value === "top" ? "top" : "bottom");
+        (_F = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _F.call(preferences);
         applySubtitleLayout();
         return;
       case "secondarySubPosition":
         secondarySubPositionSetting = value === "top" ? "top" : "bottom";
-        (_C = preferences == null ? void 0 : preferences.set) == null ? void 0 : _C.call(preferences, "secondarySubPosition", value === "top" ? "top" : "bottom");
-        (_D = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _D.call(preferences);
+        (_G = preferences == null ? void 0 : preferences.set) == null ? void 0 : _G.call(preferences, "secondarySubPosition", value === "top" ? "top" : "bottom");
+        (_H = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _H.call(preferences);
         applySubtitleLayout();
         return;
       case "ttsEnabled":
-        (_E = preferences == null ? void 0 : preferences.set) == null ? void 0 : _E.call(preferences, "ttsEnabled", coerceBoolean(value, true));
-        (_F = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _F.call(preferences);
+        (_I = preferences == null ? void 0 : preferences.set) == null ? void 0 : _I.call(preferences, "ttsEnabled", coerceBoolean(value, true));
+        (_J = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _J.call(preferences);
         return;
       case "ttsOnWordClick":
-        (_G = preferences == null ? void 0 : preferences.set) == null ? void 0 : _G.call(preferences, "ttsOnWordClick", coerceBoolean(value, true));
-        (_H = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _H.call(preferences);
+        (_K = preferences == null ? void 0 : preferences.set) == null ? void 0 : _K.call(preferences, "ttsOnWordClick", coerceBoolean(value, true));
+        (_L = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _L.call(preferences);
         return;
       case "ttsOnLineClick":
-        (_I = preferences == null ? void 0 : preferences.set) == null ? void 0 : _I.call(preferences, "ttsOnLineClick", coerceBoolean(value, true));
-        (_J = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _J.call(preferences);
+        (_M = preferences == null ? void 0 : preferences.set) == null ? void 0 : _M.call(preferences, "ttsOnLineClick", coerceBoolean(value, true));
+        (_N = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _N.call(preferences);
         return;
       case "ttsRate": {
         const num = Number(value);
         if (!Number.isNaN(num)) {
-          (_K = preferences == null ? void 0 : preferences.set) == null ? void 0 : _K.call(preferences, "ttsRate", Math.max(100, Math.min(400, num)));
-          (_L = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _L.call(preferences);
+          (_O = preferences == null ? void 0 : preferences.set) == null ? void 0 : _O.call(preferences, "ttsRate", Math.max(100, Math.min(400, num)));
+          (_P = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _P.call(preferences);
         }
         return;
       }
       case "ttsVoice":
-        (_M = preferences == null ? void 0 : preferences.set) == null ? void 0 : _M.call(preferences, "ttsVoice", String(value || ""));
+        (_Q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Q.call(preferences, "ttsVoice", String(value || ""));
         setMappedVoiceForCurrentTarget(String(value || ""));
-        (_N = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _N.call(preferences);
+        (_R = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _R.call(preferences);
         return;
       case "ttsVoiceSelector":
         applyVoiceSelectorChoice(value);
         return;
       case "ttsAutoVoice":
-        (_O = preferences == null ? void 0 : preferences.set) == null ? void 0 : _O.call(preferences, "ttsAutoVoice", coerceBoolean(value, false));
-        (_P = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _P.call(preferences);
+        (_S = preferences == null ? void 0 : preferences.set) == null ? void 0 : _S.call(preferences, "ttsAutoVoice", coerceBoolean(value, false));
+        (_T = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _T.call(preferences);
         return;
       case "ttsEngine":
-        (_Q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Q.call(preferences, "ttsEngine", value === "native" ? "native" : value === "cloud" ? "cloud" : "say");
-        (_R = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _R.call(preferences);
+        (_U = preferences == null ? void 0 : preferences.set) == null ? void 0 : _U.call(preferences, "ttsEngine", value === "native" ? "native" : value === "cloud" ? "cloud" : "say");
+        (_V = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _V.call(preferences);
         buildMenu();
         return;
       case "ttsNativeBaseUrl":
-        (_S = preferences == null ? void 0 : preferences.set) == null ? void 0 : _S.call(preferences, "ttsNativeBaseUrl", normalizeServiceBaseUrl(value, DEFAULT_NATIVE_BASE_URL));
-        (_T = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _T.call(preferences);
-        return;
-      case "ttsNativeHelperPath":
-        (_U = preferences == null ? void 0 : preferences.set) == null ? void 0 : _U.call(preferences, "ttsNativeHelperPath", String(value || "").trim());
-        (_V = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _V.call(preferences);
-        return;
-      case "ttsNativeAutoStart":
-        (_W = preferences == null ? void 0 : preferences.set) == null ? void 0 : _W.call(preferences, "ttsNativeAutoStart", coerceBoolean(value, true));
+        (_W = preferences == null ? void 0 : preferences.set) == null ? void 0 : _W.call(preferences, "ttsNativeBaseUrl", normalizeServiceBaseUrl(value, DEFAULT_NATIVE_BASE_URL));
         (_X = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _X.call(preferences);
         return;
-      case "ttsPreferPersonal":
-        (_Y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Y.call(preferences, "ttsPreferPersonal", coerceBoolean(value, true));
+      case "ttsNativeHelperPath":
+        (_Y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Y.call(preferences, "ttsNativeHelperPath", String(value || "").trim());
         (_Z = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _Z.call(preferences);
         return;
-      case "ttsNativeEngine":
-        (__ = preferences == null ? void 0 : preferences.set) == null ? void 0 : __.call(preferences, "ttsNativeEngine", value === "av" ? "av" : "nss");
+      case "ttsNativeAutoStart":
+        (__ = preferences == null ? void 0 : preferences.set) == null ? void 0 : __.call(preferences, "ttsNativeAutoStart", coerceBoolean(value, true));
         (_$ = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _$.call(preferences);
+        return;
+      case "ttsPreferPersonal":
+        (_aa = preferences == null ? void 0 : preferences.set) == null ? void 0 : _aa.call(preferences, "ttsPreferPersonal", coerceBoolean(value, true));
+        (_ba = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _ba.call(preferences);
+        return;
+      case "ttsNativeEngine":
+        (_ca = preferences == null ? void 0 : preferences.set) == null ? void 0 : _ca.call(preferences, "ttsNativeEngine", value === "av" ? "av" : "nss");
+        (_da = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _da.call(preferences);
         nativeVoices = [];
         nativeVoicesAt = 0;
         buildMenu();
@@ -4974,6 +5298,16 @@ ws.onmessage = (event) => {
           buildMenu();
         }, { selected: autoArrange })
       );
+      layoutRoot.addSubMenuItem(
+        menu.item(`Hide Native Rendering (${hideNativeSubtitleRendering ? "On" : "Off"})`, () => {
+          var _a4, _b;
+          hideNativeSubtitleRendering = !hideNativeSubtitleRendering;
+          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "hideNativeSubtitleRendering", hideNativeSubtitleRendering);
+          (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
+          syncNativeSubtitleVisibility();
+          buildMenu();
+        }, { selected: hideNativeSubtitleRendering })
+      );
       const primaryPos = primarySubPositionSetting;
       const secondaryPos = secondarySubPositionSetting;
       const primaryRoot = menu.item(`Primary Sub Position (${primaryPos})`);
@@ -5081,7 +5415,7 @@ ws.onmessage = (event) => {
       });
       presetsRoot.addSubMenuItem(
         menu.item("Reset to Defaults", () => {
-          var _a4, _b, _c, _d;
+          var _a4, _b, _c, _d, _e, _f, _g;
           const defaults = {
             targetLang: "en",
             translationProvider: "google",
@@ -5093,6 +5427,9 @@ ws.onmessage = (event) => {
             llmTemperature: 0.3,
             llmMaxTokens: 2e3,
             sentenceMode: false,
+            hideNativeSubtitleRendering: true,
+            showSourceSubtitles: false,
+            showOriginalTranscript: false,
             appearance: {
               fontSize: "large",
               bgColor: BG_COLORS.Black,
@@ -5105,10 +5442,16 @@ ws.onmessage = (event) => {
             }
           };
           (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "autoArrangeSubs", true);
-          (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "primarySubPosition", "bottom");
-          (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "secondarySubPosition", "bottom");
-          (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "segmentationEnabled", true);
+          (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "hideNativeSubtitleRendering", true);
+          (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "showSourceSubtitles", false);
+          (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "showOriginalTranscript", false);
+          (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "primarySubPosition", "bottom");
+          (_f = preferences == null ? void 0 : preferences.set) == null ? void 0 : _f.call(preferences, "secondarySubPosition", "bottom");
+          (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "segmentationEnabled", true);
           autoArrangeSubsSetting = true;
+          hideNativeSubtitleRendering = true;
+          showSourceSubtitles = false;
+          showOriginalTranscript = false;
           primarySubPositionSetting = "bottom";
           secondarySubPositionSetting = "bottom";
           segmentationEnabledSetting = true;
@@ -6049,6 +6392,7 @@ Only output the transformed text, nothing else.`,
       overlay.show();
       overlay.setOpacity(1);
       overlayLoaded = true;
+      syncNativeSubtitleVisibility();
     } catch (e) {
       console.log(`POLYSCRIPT-ERROR: Failed to load overlay: ${e.message}`);
     }
@@ -6061,18 +6405,20 @@ Only output the transformed text, nothing else.`,
       if (!getSelectedSubTrack()) {
         maybeAutoSelectSourceSubtitleTrack("poll");
       }
-      const currentText = mpv.getString("sub-text") || "";
+      const rawCurrentText = mpv.getString("sub-text") || "";
       const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
       const isPaused = typeof mpv.getFlag === "function" ? mpv.getFlag("pause") : false;
+      const tMs = typeof timePos === "number" ? timePos * 1e3 : null;
+      const activeEntry = subtitleEntries && tMs != null ? findEntryAtTime(subtitleEntries, tMs, lastSentenceIndex) : { entry: null, index: -1 };
+      const currentText = (usingFullFileTranslation || usingNativeTargetSubs) && (activeEntry == null ? void 0 : activeEntry.entry) ? String(activeEntry.entry.content || "") : rawCurrentText;
       if (typeof timePos === "number") {
         if (lastTimePos != null && timePos < lastTimePos - 0.5) {
           lastPausedSentenceIndex = -1;
         }
         lastTimePos = timePos;
       }
-      if (sentenceMode && subtitleEntries && typeof timePos === "number") {
-        const tMs = timePos * 1e3;
-        const { entry, index } = findEntryAtTime(subtitleEntries, tMs, lastSentenceIndex);
+      if (sentenceMode && (activeEntry == null ? void 0 : activeEntry.entry) && tMs != null) {
+        const { entry, index } = activeEntry;
         if (entry && entry.endMs != null) {
           if (tMs >= entry.endMs - 250 && !isPaused) {
             lastSentenceIndex = index;
@@ -6119,12 +6465,12 @@ Only output the transformed text, nothing else.`,
           subtitleChangeSerial += 1;
           pendingAutoSpeakSerial = !sentenceMode && !isPaused ? subtitleChangeSerial : 0;
           console.log(`POLYSCRIPT: New subtitle: ${currentText}`);
-          if (typeof timePos === "number" && trimmedText) {
-            const tMs = Math.round(timePos * 1e3);
+          if (typeof timePos === "number" && trimmedText && !(activeEntry == null ? void 0 : activeEntry.entry)) {
+            const tMs2 = Math.round(timePos * 1e3);
             liveTranscriptEntries.push({
               i: liveTranscriptEntries.length,
-              s: tMs,
-              e: tMs + contentAwareMinDisplay(trimmedText),
+              s: tMs2,
+              e: tMs2 + contentAwareMinDisplay(trimmedText),
               src: trimmedText,
               t: trimmedText
               // will be replaced with translation below
@@ -6232,7 +6578,24 @@ Only output the transformed text, nothing else.`,
     }
     return null;
   }
+  function primeSubtitleEntriesForSelectedTrack(reason = "selected-track") {
+    subtitleEntries = null;
+    lastSentenceIndex = -1;
+    void ensureSentenceEntries().then((ok) => {
+      if (!ok) {
+        console.log(`POLYSCRIPT: No parsed subtitle entries available for ${reason}.`);
+        syncNativeSubtitleVisibility();
+        return;
+      }
+      loadTranscriptFromCurrentSubs();
+      syncNativeSubtitleVisibility();
+    }).catch((error) => {
+      console.log(`POLYSCRIPT-ERROR: Failed to prepare subtitle entries for ${reason}: ${String((error == null ? void 0 : error.message) || error)}`);
+      syncNativeSubtitleVisibility();
+    });
+  }
   function tryUseNativeTargetSubtitles() {
+    var _a4;
     if (!useNativeSubsWhenAvailable || !polyscriptEnabled) return false;
     const effectiveTarget = getEffectiveTargetLang();
     if (!effectiveTarget) return false;
@@ -6246,6 +6609,9 @@ Only output the transformed text, nothing else.`,
       usingFullFileTranslation = false;
       usingNativeTargetSubs = true;
       sourceTrackAutoSelectedForFile = true;
+      const sourceCandidate = pickSecondarySourceTrack(nativeTrack.id);
+      lastSourceSubId = (_a4 = sourceCandidate == null ? void 0 : sourceCandidate.id) != null ? _a4 : null;
+      primeSubtitleEntriesForSelectedTrack("native-target");
       const label = String(nativeTrack.title || nativeTrack.lang || nativeTrack.language || nativeTrack.id);
       core.osd(`POLYSCRIPT: Using native ${label} subtitles`, 2e3);
       console.log(`POLYSCRIPT: Switched to native target-language subtitle track id=${nativeTrack.id} lang=${label}`);
@@ -6340,6 +6706,7 @@ Only output the transformed text, nothing else.`,
     try {
       mpv.set("sid", candidate.id);
       lastNativeSubId = candidate.id;
+      lastSourceSubId = candidate.id;
       sourceTrackAutoSelectedForFile = true;
       const label = String(candidate.title || candidate.lang || candidate.language || candidate.id);
       core.osd(`POLYSCRIPT: Using subtitles (${label})`, 1400);
@@ -6563,6 +6930,7 @@ ${e.content}
       const prevId = prevTrack && typeof prevTrack.id === "number" ? prevTrack.id : null;
       if (prevId != null) {
         lastNativeSubId = prevId;
+        lastSourceSubId = prevId;
       }
       mpv.command("sub-add", [outPath, "select"]);
       setTimeout(() => {
@@ -6574,13 +6942,12 @@ ${e.content}
           );
           if (newTrack && typeof newTrack.id === "number") {
             mpv.set("sid", newTrack.id);
-            if (prevId != null) {
-              mpv.set("secondary-sid", prevId);
-            }
             lastTranslatedSubPath = outPath;
             usingFullFileTranslation = true;
+            usingNativeTargetSubs = false;
             subtitleEntries = entries;
             lastSentenceIndex = -1;
+            syncNativeSubtitleVisibility();
           }
         } catch {
         }
@@ -6706,6 +7073,7 @@ ${e.content}
     core.osd("Polyscript is active.", 5e3);
     if (polyscriptEnabled) {
       ensureOverlayLoaded();
+      syncNativeSubtitleVisibility();
       maybeAutoSelectSourceSubtitleTrack("initialize");
       ensureSentenceEntries().then((ok) => {
         if (ok) {
@@ -6739,6 +7107,7 @@ ${e.content}
     subSuppressedText = "";
     lastLookaheadIndex = -1;
     liveTranscriptEntries = [];
+    syncNativeSubtitleVisibility();
     setTimeout(() => maybeAutoSelectSourceSubtitleTrack("file-loaded"), 450);
     setTimeout(initializeSubtitleSystem, 1500);
     if (autoLoadSubtitlesEnabled) {
@@ -6749,6 +7118,7 @@ ${e.content}
     var _a4;
     buildMenu();
     ensureOverlayLoaded();
+    syncNativeSubtitleVisibility();
     try {
       (_a4 = sidebar == null ? void 0 : sidebar.loadFile) == null ? void 0 : _a4.call(sidebar, "dist/ui/sidebar/index.html");
     } catch (e) {

@@ -23615,9 +23615,18 @@
     const s = totalSec % 60;
     return `${m}:${String(s).padStart(2, "0")}`;
   }
-  function TranscriptPanel({ entries, timeMs, search, onSearchChange, activeRef }) {
+  function TranscriptPanel({ entries, timeMs, search, onSearchChange, activeRef, showOriginal, onToggleOriginal }) {
     const query = (search || "").trim().toLowerCase();
-    const filtered = query ? entries.filter((e) => (e.t || "").toLowerCase().includes(query)) : entries;
+    const hasDistinctOriginal = entries.some((entry) => {
+      const src = String((entry == null ? void 0 : entry.src) || "").trim();
+      const translated = String((entry == null ? void 0 : entry.t) || "").trim();
+      return src && translated && src !== translated;
+    });
+    const filtered = query ? entries.filter((e) => {
+      const translated = String((e == null ? void 0 : e.t) || "").toLowerCase();
+      const original = String((e == null ? void 0 : e.src) || "").toLowerCase();
+      return translated.includes(query) || original.includes(query);
+    }) : entries;
     let activeIdx = -1;
     if (!query) {
       for (let i = filtered.length - 1; i >= 0; i--) {
@@ -23645,7 +23654,17 @@
         value: search,
         onChange: (e) => onSearchChange(e.target.value)
       }
-    )), query && filtered.length < entries.length ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-filter-info" }, /* @__PURE__ */ import_react.default.createElement("span", null, "Showing ", filtered.length, " matches"), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-transcript-clear-btn", type: "button", onClick: () => onSearchChange("") }, "Clear")) : null, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-list" }, filtered.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-title" }, entries.length === 0 ? "No transcript yet" : "No matches"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-body" }, entries.length === 0 ? "Play a video with subtitles to see the transcript here." : "Try a different search term.")) : filtered.map((entry, i) => {
+    )), hasDistinctOriginal ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-display-row", role: "group", "aria-label": "Transcript display controls" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-display-label" }, "Display"), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        className: `ps-transcript-switch ${showOriginal ? "is-on" : ""}`,
+        type: "button",
+        onClick: onToggleOriginal,
+        "aria-pressed": showOriginal
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-track" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-thumb" })),
+      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-label" }, "Original")
+    )) : null, query && filtered.length < entries.length ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-filter-info" }, /* @__PURE__ */ import_react.default.createElement("span", null, "Showing ", filtered.length, " matches"), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-transcript-clear-btn", type: "button", onClick: () => onSearchChange("") }, "Clear")) : null, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-list" }, filtered.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-title" }, entries.length === 0 ? "No transcript yet" : "No matches"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-body" }, entries.length === 0 ? "Play a video with subtitles to see the transcript here." : "Try a different search term.")) : filtered.map((entry, i) => {
       const isActive = i === activeIdx;
       return /* @__PURE__ */ import_react.default.createElement(
         "div",
@@ -23663,14 +23682,7 @@
           },
           formatTime(entry.s)
         ),
-        /* @__PURE__ */ import_react.default.createElement(
-          "span",
-          {
-            className: "ps-transcript-text",
-            onClick: () => sendMessage("ps:transcriptSeek", { time: entry.s })
-          },
-          entry.t
-        )
+        /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-copy", onClick: () => sendMessage("ps:transcriptSeek", { time: entry.s }) }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-text" }, entry.t), showOriginal && entry.src && entry.src !== entry.t ? /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-original" }, entry.src) : null)
       );
     })));
   }
@@ -23693,7 +23705,7 @@
     { value: "5", label: "5 seconds" }
   ];
   var App = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     const [settings, setSettings] = (0, import_react.useState)(null);
     const [loginEmailDraft, setLoginEmailDraft] = (0, import_react.useState)("");
     const [targetInput, setTargetInput] = (0, import_react.useState)("");
@@ -23878,8 +23890,6 @@
     const aiSummary = translationProvider === "polyscript" ? aiLabel || aiStatusTitle : "Google translation is ready.";
     const aiNoteClass = aiState === "expired" || aiState === "signin_required" ? "ps-inline-note is-error" : "ps-inline-note is-info";
     const voiceSelectorOptions = Array.isArray((_a = settings.voiceSelector) == null ? void 0 : _a.options) ? settings.voiceSelector.options : [];
-    const cloudVoiceOptions = Array.isArray((_b = settings.voiceSelector) == null ? void 0 : _b.cloudVoiceOptions) ? settings.voiceSelector.cloudVoiceOptions : [];
-    const showCloudVoiceSelect = ((_c = settings.voiceSelector) == null ? void 0 : _c.value) === "cloud";
     const sentenceResumeValue = settings.sentenceAutoResume ? String(settings.sentenceAutoResumeDelay || 2) : "0";
     const applySentenceResume = (value) => {
       const next = String(value || "0");
@@ -24087,7 +24097,7 @@
       {
         title: "Transliteration",
         subtitle: "Show transliteration",
-        enabled: !!((_d = settings.appearance) == null ? void 0 : _d.showTranslit),
+        enabled: !!((_b = settings.appearance) == null ? void 0 : _b.showTranslit),
         onToggle: () => {
           var _a2;
           return updateSetting("showTransliteration", !((_a2 = settings.appearance) == null ? void 0 : _a2.showTranslit));
@@ -24106,17 +24116,17 @@
     ), /* @__PURE__ */ import_react.default.createElement(
       ToggleRow,
       {
-        title: "Prefer Native Subtitles",
-        subtitle: "Use target-language subs when available",
-        enabled: settings.useNativeSubsWhenAvailable !== false,
-        onToggle: () => updateSetting("useNativeSubsWhenAvailable", settings.useNativeSubsWhenAvailable === false)
+        title: "Source Subtitles",
+        subtitle: "Show the source-language subtitle track alongside your target line",
+        enabled: settings.showSourceSubtitles === true,
+        onToggle: () => updateSetting("showSourceSubtitles", settings.showSourceSubtitles !== true)
       }
     )), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Speech"), /* @__PURE__ */ import_react.default.createElement(
       ToggleRow,
       {
         title: "Speaking Mode",
         subtitle: "Read translated subtitles aloud",
-        enabled: !!((_e = settings.tts) == null ? void 0 : _e.enabled),
+        enabled: !!((_c = settings.tts) == null ? void 0 : _c.enabled),
         onToggle: () => {
           var _a2;
           return updateSetting("ttsEnabled", !((_a2 = settings.tts) == null ? void 0 : _a2.enabled));
@@ -24135,19 +24145,23 @@
       "select",
       {
         className: "ps-select",
-        value: ((_f = settings.voiceSelector) == null ? void 0 : _f.value) || "system",
+        value: ((_d = settings.voiceSelector) == null ? void 0 : _d.value) || "auto",
         onChange: (e) => updateSetting("ttsVoiceSelector", e.target.value)
       },
-      voiceSelectorOptions.map((option) => /* @__PURE__ */ import_react.default.createElement("option", { key: option.value, value: option.value }, option.label))
-    ), showCloudVoiceSelect ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", null, "Cloud Voice"), /* @__PURE__ */ import_react.default.createElement(
-      "select",
-      {
-        className: "ps-select",
-        value: ((_g = settings.voiceSelector) == null ? void 0 : _g.selectedCloudVoice) || "",
-        onChange: (e) => updateSetting("ttsVoice", e.target.value)
-      },
-      cloudVoiceOptions.length ? cloudVoiceOptions.map((option) => /* @__PURE__ */ import_react.default.createElement("option", { key: option.value, value: option.value }, option.label)) : /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Loading voices...")
-    )) : null, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-filter-note" }, showCloudVoiceSelect ? "Using your saved Polyscript cloud voice." : ((_h = settings.voiceSelector) == null ? void 0 : _h.personalAvailable) ? `Using your Mac personal voice for ${((_i = settings.voiceSelector) == null ? void 0 : _i.targetLabel) || "this target"}.` : "Using your Mac system voice."), settings.sentenceMode ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", null, "Sentence Auto Resume"), /* @__PURE__ */ import_react.default.createElement("select", { className: "ps-select", value: sentenceResumeValue, onChange: (e) => applySentenceResume(e.target.value) }, SENTENCE_RESUME_OPTIONS.map((option) => /* @__PURE__ */ import_react.default.createElement("option", { key: option.value, value: option.value }, option.label))), /* @__PURE__ */ import_react.default.createElement(
+      (() => {
+        const grouped = voiceSelectorOptions.reduce((acc, option) => {
+          const group = String(option.group || "");
+          if (!group) {
+            acc.ungrouped.push(option);
+          } else {
+            if (!acc.groups[group]) acc.groups[group] = [];
+            acc.groups[group].push(option);
+          }
+          return acc;
+        }, { ungrouped: [], groups: {} });
+        return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, grouped.ungrouped.map((option) => /* @__PURE__ */ import_react.default.createElement("option", { key: option.value, value: option.value }, option.label)), Object.entries(grouped.groups).map(([groupLabel, options]) => /* @__PURE__ */ import_react.default.createElement("optgroup", { key: groupLabel, label: groupLabel }, options.map((option) => /* @__PURE__ */ import_react.default.createElement("option", { key: option.value, value: option.value }, option.label)))));
+      })()
+    ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-filter-note" }, ((_g = (_f = (_e = settings.voiceSelector) == null ? void 0 : _e.value) == null ? void 0 : _f.startsWith) == null ? void 0 : _g.call(_f, "cloud:")) ? "Using your saved Polyscript cloud voice." : ((_h = settings.voiceSelector) == null ? void 0 : _h.value) === "personal" ? `Using your Mac personal voice for ${((_i = settings.voiceSelector) == null ? void 0 : _i.targetLabel) || "this target"}.` : ((_l = (_k = (_j = settings.voiceSelector) == null ? void 0 : _j.value) == null ? void 0 : _k.startsWith) == null ? void 0 : _l.call(_k, "system:")) ? "Using your selected Mac system voice." : "Using your Mac system voice."), settings.sentenceMode ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", null, "Sentence Auto Resume"), /* @__PURE__ */ import_react.default.createElement("select", { className: "ps-select", value: sentenceResumeValue, onChange: (e) => applySentenceResume(e.target.value) }, SENTENCE_RESUME_OPTIONS.map((option) => /* @__PURE__ */ import_react.default.createElement("option", { key: option.value, value: option.value }, option.label))), /* @__PURE__ */ import_react.default.createElement(
       ToggleRow,
       {
         title: "Speak On Pause",
@@ -24159,7 +24173,7 @@
       "select",
       {
         className: "ps-select",
-        value: ((_j = settings.appearance) == null ? void 0 : _j.overlayDock) || "bottom",
+        value: ((_m = settings.appearance) == null ? void 0 : _m.overlayDock) || "bottom",
         onChange: (e) => updateSetting("overlayDock", e.target.value)
       },
       /* @__PURE__ */ import_react.default.createElement("option", { value: "bottom" }, "Bottom"),
@@ -24168,14 +24182,14 @@
       "select",
       {
         className: "ps-select",
-        value: ((_k = settings.appearance) == null ? void 0 : _k.fontSize) || "large",
+        value: ((_n = settings.appearance) == null ? void 0 : _n.fontSize) || "large",
         onChange: (e) => updateSetting("fontSize", e.target.value)
       },
       /* @__PURE__ */ import_react.default.createElement("option", { value: "small" }, "Small"),
       /* @__PURE__ */ import_react.default.createElement("option", { value: "medium" }, "Medium"),
       /* @__PURE__ */ import_react.default.createElement("option", { value: "large" }, "Large"),
       /* @__PURE__ */ import_react.default.createElement("option", { value: "xl" }, "Extra Large")
-    ), /* @__PURE__ */ import_react.default.createElement("label", null, "Background Opacity \u2014 ", Math.round(((_m = (_l = settings.appearance) == null ? void 0 : _l.bgOpacity) != null ? _m : 0.85) * 100), "%"), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement("label", null, "Background Opacity \u2014 ", Math.round(((_p = (_o = settings.appearance) == null ? void 0 : _o.bgOpacity) != null ? _p : 0.85) * 100), "%"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         className: "ps-input",
@@ -24183,7 +24197,7 @@
         min: "0",
         max: "1",
         step: "0.05",
-        value: (_o = (_n = settings.appearance) == null ? void 0 : _n.bgOpacity) != null ? _o : 0.85,
+        value: (_r = (_q = settings.appearance) == null ? void 0 : _q.bgOpacity) != null ? _r : 0.85,
         onChange: (e) => updateSetting("overlayBgOpacity", parseFloat(e.target.value))
       }
     ), /* @__PURE__ */ import_react.default.createElement("label", null, "Auto Arrange"), /* @__PURE__ */ import_react.default.createElement(
@@ -24202,7 +24216,9 @@
         timeMs: transcriptTimeMs,
         search: transcriptSearch,
         onSearchChange: setTranscriptSearch,
-        activeRef: transcriptActiveRef
+        activeRef: transcriptActiveRef,
+        showOriginal: settings.showOriginalTranscript === true,
+        onToggleOriginal: () => updateSetting("showOriginalTranscript", settings.showOriginalTranscript !== true)
       }
     ) : null);
   };
