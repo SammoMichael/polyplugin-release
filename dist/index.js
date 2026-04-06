@@ -6238,11 +6238,10 @@ Only output the transformed text, nothing else.`,
     const parsed = parseNumberedOutput(result, 1, 0);
     return parsed[0] || text;
   }
-  var lastTranslationFallbackOsdAt = 0;
+  var shownTranslationFallbacks = /* @__PURE__ */ new Set();
   function notifyTranslationFallback(message) {
-    const now = Date.now();
-    if (now - lastTranslationFallbackOsdAt < 3e4) return;
-    lastTranslationFallbackOsdAt = now;
+    if (shownTranslationFallbacks.has(message)) return;
+    shownTranslationFallbacks.add(message);
     core.osd(message, 2500);
   }
   async function translateTextViaPreferredProvider(text, target) {
