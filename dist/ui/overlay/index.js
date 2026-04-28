@@ -23587,6 +23587,8 @@
 
   // ui/overlay/app.jsx
   var import_react = __toESM(require_react());
+  var HOVER_LOOKUP_DELAY_MS = 190;
+  var HOVER_CLOSE_DELAY_MS = 850;
   function postIinaMessage(name, data) {
     var _a, _b, _c;
     if ((_a = window.iina) == null ? void 0 : _a.postMessage) {
@@ -23672,6 +23674,26 @@
     const lookupCacheRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
     const pendingRef = (0, import_react.useRef)(/* @__PURE__ */ new Set());
     const popupRef = (0, import_react.useRef)(null);
+    const hoverIntentRef = (0, import_react.useRef)(null);
+    const hoverCloseRef = (0, import_react.useRef)(null);
+    const clearHoverIntent = () => {
+      if (!hoverIntentRef.current) return;
+      clearTimeout(hoverIntentRef.current);
+      hoverIntentRef.current = null;
+    };
+    const clearHoverClose = () => {
+      if (!hoverCloseRef.current) return;
+      clearTimeout(hoverCloseRef.current);
+      hoverCloseRef.current = null;
+    };
+    const schedulePopupClose = () => {
+      clearHoverIntent();
+      clearHoverClose();
+      hoverCloseRef.current = setTimeout(() => {
+        hoverCloseRef.current = null;
+        setPopup((prev) => ({ ...prev, visible: false }));
+      }, HOVER_CLOSE_DELAY_MS);
+    };
     (0, import_react.useEffect)(() => {
       const handleMessage = (event) => {
         const detail = event == null ? void 0 : event.detail;
@@ -23693,7 +23715,11 @@
         }
       };
       window.addEventListener("iina.message", handleMessage);
-      return () => window.removeEventListener("iina.message", handleMessage);
+      return () => {
+        clearHoverIntent();
+        clearHoverClose();
+        window.removeEventListener("iina.message", handleMessage);
+      };
     }, []);
     const lines = (0, import_react.useMemo)(() => splitSubtitleLines(subtitleText), [subtitleText]);
     (0, import_react.useEffect)(() => {
@@ -23727,12 +23753,33 @@
       }
     };
     const handleWordHover = (event, word) => {
+      if (!word) return;
+      const { clientX, clientY } = event;
+      clearHoverIntent();
+      clearHoverClose();
+      hoverIntentRef.current = setTimeout(() => {
+        hoverIntentRef.current = null;
+        setPopup({ visible: true, word, x: clientX, y: clientY });
+        requestLookup(word);
+      }, HOVER_LOOKUP_DELAY_MS);
+    };
+    const handleWordLeave = () => {
+      schedulePopupClose();
+    };
+    const handleWordClick = (event, word) => {
+      if (!word) return;
+      clearHoverIntent();
+      clearHoverClose();
       const { clientX, clientY } = event;
       setPopup({ visible: true, word, x: clientX, y: clientY });
       requestLookup(word);
     };
-    const handleWordLeave = () => {
-      setPopup((prev) => ({ ...prev, visible: false }));
+    const handlePopupEnter = () => {
+      clearHoverIntent();
+      clearHoverClose();
+    };
+    const handlePopupLeave = () => {
+      schedulePopupClose();
     };
     return /* @__PURE__ */ import_react.default.createElement("div", { className: "polyscript-overlay" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "subtitle-container" }, lines.map((line, lineIndex) => /* @__PURE__ */ import_react.default.createElement("div", { className: "subtitle-line", key: `line-${lineIndex}` }, tokenizeLine(line).map((token, tokenIndex) => {
       if (token.isSpace) {
@@ -23748,7 +23795,7 @@
           className: "subtitle-word",
           onMouseEnter: (event) => handleWordHover(event, token.text),
           onMouseLeave: handleWordLeave,
-          onClick: (event) => handleWordHover(event, token.text)
+          onClick: (event) => handleWordClick(event, token.text)
         },
         token.text
       );
@@ -23757,7 +23804,9 @@
       {
         ref: popupRef,
         className: "word-popup",
-        style: { left: popupPosition.left, top: popupPosition.top }
+        style: { left: popupPosition.left, top: popupPosition.top },
+        onMouseEnter: handlePopupEnter,
+        onMouseLeave: handlePopupLeave
       },
       /* @__PURE__ */ import_react.default.createElement("div", { className: "word-popup-title" }, popup.word),
       lookupStatus.word !== popup.word && /* @__PURE__ */ import_react.default.createElement("div", { className: "word-popup-body" }, "Loading\u2026"),

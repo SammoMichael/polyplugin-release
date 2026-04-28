@@ -420,6 +420,11 @@ input[type=range].ps-input::-webkit-slider-thumb {
       rgba(76, 119, 229, 0.92));
   color: #f4f8ff;
 }
+.ps-btn.ps-btn-compact {
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.1;
+}
 .ps-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

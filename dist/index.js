@@ -22,6 +22,8 @@
   var translatingFile = false;
   var lastRenderedText = "";
   var lastOriginalText = "";
+  var lastOriginalCueToken = "";
+  var lastOriginalSourceText = "";
   var showTransliteration = true;
   var translitCache = /* @__PURE__ */ new Map();
   var translitPending = /* @__PURE__ */ new Set();
@@ -37,15 +39,29 @@
   var lineTranslationQueued = /* @__PURE__ */ new Set();
   var lineTranslationActive = 0;
   var lineTranslationGeneration = 0;
+  var secondaryTranslationCache = /* @__PURE__ */ new Map();
+  var secondaryTranslationPending = /* @__PURE__ */ new Set();
+  var exactTimelineTranslationGeneration = 0;
+  var exactTimelineTranslationJobKey = "";
+  var exactTimelineTranslationActive = false;
+  var exactTimelineWindowGeneration = 0;
+  var exactTimelineWindowAnchorIndex = -1;
+  var exactTimelineWindowActive = false;
+  var exactTimelineFullFileTranslationRequestKey = "";
   var usingFullFileTranslation = false;
   var showedLineTranslateOsd = false;
   var targetLang = preferences && typeof preferences.get === "function" && preferences.get("targetLang") || "en";
+  var _a;
+  var secondaryTargetLang = String(((_a = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a.call(preferences, "secondaryTargetLang")) || "").trim();
   var sentenceMode = coerceBoolean(
     preferences && typeof preferences.get === "function" && preferences.get("sentenceMode") || false,
     false
   );
   var subtitleEntries = null;
+  var sourceSubtitleEntries = null;
   var lastSentenceIndex = -1;
+  var lastActiveSubtitleIndex = -1;
+  var lastSourceSubtitleIndex = -1;
   var translationProvider = preferences && typeof preferences.get === "function" && preferences.get("translationProvider") || "google";
   var polyscriptToken = preferences && typeof preferences.get === "function" && preferences.get("polyscriptToken") || "";
   var DEFAULT_POLYSCRIPT_BASE_URL = "https://polyscript.app";
@@ -61,32 +77,58 @@
   var llmMetaPrompt = preferences && typeof preferences.get === "function" && preferences.get("llmMetaPrompt") || "";
   var llmCustomPrompt = preferences && typeof preferences.get === "function" && preferences.get("llmCustomPrompt") || "";
   var llmCustomTarget = preferences && typeof preferences.get === "function" && preferences.get("llmCustomTarget") || "";
-  var _a;
-  var polyscriptEnabledRaw = (_a = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a.call(preferences, "polyscriptEnabled");
+  var _a2;
+  var polyscriptEnabledRaw = (_a2 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a2.call(preferences, "polyscriptEnabled");
   var polyscriptEnabled = coerceBoolean(polyscriptEnabledRaw, true);
   var deviceLoginTimer = null;
   var deviceLoginDeviceId = null;
   var deviceLoginVerificationUrl = "";
   var deviceLoginPollInFlight = false;
   var subtitlePollTimer = null;
+  var subtitleEntriesSourceKey = "";
+  var sourceSubtitleEntriesSourceKey = "";
   var BASE_MIN_SUB_DISPLAY_MS = 800;
   var PER_CHAR_MS = 30;
   var MAX_MIN_SUB_DISPLAY_MS = 3500;
   var MAX_SUB_DISPLAY_MS = 8e3;
+  var FILE_TIMELINE_SUBTITLE_POLL_MS = 8;
+  var FILE_TIMELINE_SENTENCE_PAUSE_LEAD_MS = 120;
+  var LIVE_SUBTITLE_POLL_MS = 100;
+  var PREPARED_SUBTITLE_LLM_CONCURRENCY = 2;
+  var TRANSCRIPT_TIME_POLL_MS = 120;
+  var TRANSCRIPT_TIME_EMIT_GRANULARITY_MS = 90;
   function contentAwareMinDisplay(text) {
     const len = (text || "").length;
     return Math.min(BASE_MIN_SUB_DISPLAY_MS + len * PER_CHAR_MS, MAX_MIN_SUB_DISPLAY_MS);
+  }
+  function hashString(value) {
+    const input = String(value || "");
+    let hash = 5381;
+    for (let i = 0; i < input.length; i += 1) {
+      hash = (hash << 5) + hash ^ input.charCodeAt(i);
+    }
+    return (hash >>> 0).toString(36);
+  }
+  function buildPreparedSubtitleCachePath(sourceKey) {
+    return `/tmp/polyscript_prepared_${hashString(sourceKey)}.srt`;
   }
   var subFirstShownAt = 0;
   var subLastDisplayedText = "";
   var subLastDisplayedSub = null;
   var subSuppressedText = "";
+  var subLastDisplayedCueToken = "";
+  var subSuppressedCueToken = "";
+  var lastSourceOverlayText = "";
+  var lastRenderedSourceText = "";
+  var lastRenderedCueToken = "";
   var lastNativeSubId = null;
   var lastTranslatedSubPath = null;
   var transcriptTimePollTimer = null;
   var lastTranscriptTimePos = -1;
   var liveTranscriptEntries = [];
   var pendingRenderText = null;
+  var pendingRenderSourceText = "";
+  var pendingRenderCueToken = "";
   var renderScheduled = false;
   var currentTranslateJobId = 0;
   var originalSubPositions = { captured: false, primary: null, secondary: null };
@@ -152,39 +194,39 @@
   var lastMissingLoginOsdAt = 0;
   var lastSessionExpiredOsdAt = 0;
   var autoPickSourceSubtitlesEnabled = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "autoPickSourceSubtitles");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "autoPickSourceSubtitles");
     return coerceBoolean(raw, true);
   })();
   var segmentationEnabledSetting = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "segmentationEnabled");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "segmentationEnabled");
     return coerceBoolean(raw, true);
   })();
   var autoArrangeSubsSetting = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "autoArrangeSubs");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "autoArrangeSubs");
     return coerceBoolean(raw, false);
   })();
   var hideNativeSubtitleRendering = true;
   var showSourceSubtitles = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "showSourceSubtitles");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "showSourceSubtitles");
     return coerceBoolean(raw, false);
   })();
   var showOriginalTranscript = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "showOriginalTranscript");
-    return coerceBoolean(raw, false);
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "showOriginalTranscript");
+    return coerceBoolean(raw, true);
   })();
   var primarySubPositionSetting = (() => {
-    var _a4;
-    const raw = String(((_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "primarySubPosition")) || "bottom");
+    var _a5;
+    const raw = String(((_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "primarySubPosition")) || "bottom");
     return raw === "top" ? "top" : "bottom";
   })();
   var secondarySubPositionSetting = (() => {
-    var _a4;
-    const raw = String(((_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "secondarySubPosition")) || "bottom");
+    var _a5;
+    const raw = String(((_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "secondarySubPosition")) || "bottom");
     return raw === "top" ? "top" : "bottom";
   })();
   var appearanceSettingsCache = null;
@@ -216,9 +258,9 @@
     }, 0);
   }
   function showSidebarPanel() {
-    var _a4;
+    var _a5;
     try {
-      (_a4 = sidebar == null ? void 0 : sidebar.show) == null ? void 0 : _a4.call(sidebar);
+      (_a5 = sidebar == null ? void 0 : sidebar.show) == null ? void 0 : _a5.call(sidebar);
       sidebarVisible = true;
       emitSidebarSettings();
     } catch {
@@ -411,17 +453,17 @@
     };
   }
   function loadSentenceSettingsFromPreferences() {
-    var _a4, _b, _c;
+    var _a5, _b, _c;
     return normalizeSentenceSettings({
-      autoResume: (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "sentenceAutoResume"),
+      autoResume: (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "sentenceAutoResume"),
       delay: (_b = preferences == null ? void 0 : preferences.get) == null ? void 0 : _b.call(preferences, "sentenceAutoResumeDelay"),
       ttsOnPause: (_c = preferences == null ? void 0 : preferences.get) == null ? void 0 : _c.call(preferences, "sentenceTtsOnPause")
     });
   }
   function loadTtsSettingsFromPreferences() {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     return normalizeTtsSettings({
-      enabled: (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "ttsEnabled"),
+      enabled: (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "ttsEnabled"),
       wordClick: (_b = preferences == null ? void 0 : preferences.get) == null ? void 0 : _b.call(preferences, "ttsOnWordClick"),
       lineClick: (_c = preferences == null ? void 0 : preferences.get) == null ? void 0 : _c.call(preferences, "ttsOnLineClick"),
       rate: (_d = preferences == null ? void 0 : preferences.get) == null ? void 0 : _d.call(preferences, "ttsRate"),
@@ -437,24 +479,24 @@
     });
   }
   var savedLoginEmailCache = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "polyscriptLoginEmail");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "polyscriptLoginEmail");
     return typeof raw === "string" ? raw.trim() : "";
   })();
   var sentenceSettingsCache = loadSentenceSettingsFromPreferences();
   var ttsSettingsCache = loadTtsSettingsFromPreferences();
-  var _a2;
-  var ttsVoiceMapCache = parseTtsVoiceMap((_a2 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a2.call(preferences, "ttsVoiceMap"));
+  var _a3;
+  var ttsVoiceMapCache = parseTtsVoiceMap((_a3 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a3.call(preferences, "ttsVoiceMap"));
   var ttsDebugEnabledCache = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "ttsDebug");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "ttsDebug");
     return coerceBoolean(raw, false);
   })();
-  var _a3;
-  var recentLangsCache = parseRecentLangs((_a3 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a3.call(preferences, "psRecentLangs"));
+  var _a4;
+  var recentLangsCache = parseRecentLangs((_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "psRecentLangs"));
   var autoLoadSubtitlesEnabled = (() => {
-    var _a4;
-    const raw = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, "autoLoadSubtitles");
+    var _a5;
+    const raw = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, "autoLoadSubtitles");
     return coerceBoolean(raw, false);
   })();
   var useNativeSubsWhenAvailable = true;
@@ -563,6 +605,9 @@
       case "autoPickSourceSubtitles":
         autoPickSourceSubtitlesEnabled = coerceBoolean(value, autoPickSourceSubtitlesEnabled);
         return;
+      case "secondaryTargetLang":
+        secondaryTargetLang = String(value || "").trim();
+        return;
       case "showOriginalTranscript":
         showOriginalTranscript = coerceBoolean(value, showOriginalTranscript);
         return;
@@ -600,9 +645,9 @@
     }
   }
   function getTelemetryDeviceId() {
-    var _a4, _b, _c;
+    var _a5, _b, _c;
     if (telemetryDeviceIdCache) return telemetryDeviceIdCache;
-    const existing = (_a4 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a4.call(preferences, TELEMETRY_DEVICE_ID_PREF_KEY);
+    const existing = (_a5 = preferences == null ? void 0 : preferences.get) == null ? void 0 : _a5.call(preferences, TELEMETRY_DEVICE_ID_PREF_KEY);
     if (existing) {
       telemetryDeviceIdCache = String(existing);
       return telemetryDeviceIdCache;
@@ -940,15 +985,16 @@
     }
   }
   function savePresets(presets) {
-    var _a4;
+    var _a5;
     if (!preferences || typeof preferences.set !== "function") return;
     preferences.set("psPresets", JSON.stringify(presets));
-    (_a4 = preferences.sync) == null ? void 0 : _a4.call(preferences);
+    (_a5 = preferences.sync) == null ? void 0 : _a5.call(preferences);
   }
   function getCurrentSettingsSnapshot() {
     const appearance = getAppearanceSettings();
     return {
       targetLang,
+      secondaryTargetLang,
       translationProvider,
       llmMode,
       llmMetaPrompt,
@@ -970,12 +1016,12 @@
     };
   }
   function applySettingsSnapshot(snapshot) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
     if (!snapshot || typeof snapshot !== "object") return;
     const nextTarget = snapshot.targetLang;
     if (nextTarget && GOOGLE_TRANSLATE_LANGS[nextTarget]) {
       targetLang = nextTarget;
-      (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "targetLang", targetLang);
+      (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "targetLang", targetLang);
     }
     const nextProvider = snapshot.translationProvider;
     if (nextProvider === "google" || nextProvider === "polyscript") {
@@ -999,64 +1045,68 @@
       llmCustomTarget = snapshot.llmCustomTarget;
       (_f = preferences == null ? void 0 : preferences.set) == null ? void 0 : _f.call(preferences, "llmCustomTarget", llmCustomTarget);
     }
+    if (typeof snapshot.secondaryTargetLang === "string") {
+      secondaryTargetLang = String(snapshot.secondaryTargetLang || "").trim();
+      (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "secondaryTargetLang", secondaryTargetLang);
+    }
     if (typeof snapshot.llmModel === "string") {
       llmModel = snapshot.llmModel;
-      (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "llmModel", llmModel);
+      (_h = preferences == null ? void 0 : preferences.set) == null ? void 0 : _h.call(preferences, "llmModel", llmModel);
     }
     if (typeof snapshot.llmTemperature === "number") {
       llmTemperature = snapshot.llmTemperature;
-      (_h = preferences == null ? void 0 : preferences.set) == null ? void 0 : _h.call(preferences, "llmTemperature", llmTemperature);
+      (_i = preferences == null ? void 0 : preferences.set) == null ? void 0 : _i.call(preferences, "llmTemperature", llmTemperature);
     }
     if (typeof snapshot.llmMaxTokens === "number") {
       llmMaxTokens = snapshot.llmMaxTokens;
-      (_i = preferences == null ? void 0 : preferences.set) == null ? void 0 : _i.call(preferences, "llmMaxTokens", llmMaxTokens);
+      (_j = preferences == null ? void 0 : preferences.set) == null ? void 0 : _j.call(preferences, "llmMaxTokens", llmMaxTokens);
     }
     if (typeof snapshot.sentenceMode === "boolean") {
       sentenceMode = snapshot.sentenceMode;
-      (_j = preferences == null ? void 0 : preferences.set) == null ? void 0 : _j.call(preferences, "sentenceMode", sentenceMode);
+      (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "sentenceMode", sentenceMode);
     }
     if (typeof snapshot.polyscriptEnabled === "boolean") {
       polyscriptEnabled = snapshot.polyscriptEnabled;
-      (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "polyscriptEnabled", polyscriptEnabled);
+      (_l = preferences == null ? void 0 : preferences.set) == null ? void 0 : _l.call(preferences, "polyscriptEnabled", polyscriptEnabled);
     }
     hideNativeSubtitleRendering = true;
-    (_l = preferences == null ? void 0 : preferences.set) == null ? void 0 : _l.call(preferences, "hideNativeSubtitleRendering", true);
+    (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "hideNativeSubtitleRendering", true);
     if (typeof snapshot.showSourceSubtitles === "boolean") {
       showSourceSubtitles = snapshot.showSourceSubtitles;
-      (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "showSourceSubtitles", showSourceSubtitles);
+      (_n = preferences == null ? void 0 : preferences.set) == null ? void 0 : _n.call(preferences, "showSourceSubtitles", showSourceSubtitles);
     }
     if (typeof snapshot.showOriginalTranscript === "boolean") {
       showOriginalTranscript = snapshot.showOriginalTranscript;
-      (_n = preferences == null ? void 0 : preferences.set) == null ? void 0 : _n.call(preferences, "showOriginalTranscript", showOriginalTranscript);
+      (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "showOriginalTranscript", showOriginalTranscript);
     }
     if (typeof snapshot.autoArrangeSubs === "boolean") {
       autoArrangeSubsSetting = snapshot.autoArrangeSubs;
-      (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "autoArrangeSubs", snapshot.autoArrangeSubs);
+      (_p = preferences == null ? void 0 : preferences.set) == null ? void 0 : _p.call(preferences, "autoArrangeSubs", snapshot.autoArrangeSubs);
     }
     if (typeof snapshot.primarySubPosition === "string") {
       primarySubPositionSetting = snapshot.primarySubPosition === "top" ? "top" : "bottom";
-      (_p = preferences == null ? void 0 : preferences.set) == null ? void 0 : _p.call(preferences, "primarySubPosition", snapshot.primarySubPosition);
+      (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "primarySubPosition", snapshot.primarySubPosition);
     }
     if (typeof snapshot.secondarySubPosition === "string") {
       secondarySubPositionSetting = snapshot.secondarySubPosition === "top" ? "top" : "bottom";
-      (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "secondarySubPosition", snapshot.secondarySubPosition);
+      (_r = preferences == null ? void 0 : preferences.set) == null ? void 0 : _r.call(preferences, "secondarySubPosition", snapshot.secondarySubPosition);
     }
     if (typeof snapshot.segmentationEnabled === "boolean") {
       segmentationEnabledSetting = snapshot.segmentationEnabled;
-      (_r = preferences == null ? void 0 : preferences.set) == null ? void 0 : _r.call(preferences, "segmentationEnabled", snapshot.segmentationEnabled);
+      (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "segmentationEnabled", snapshot.segmentationEnabled);
     }
     if (snapshot.appearance && typeof snapshot.appearance === "object") {
       const app = snapshot.appearance;
-      if (app.fontSize) (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "overlayFontSize", app.fontSize);
-      if (app.bgColor) (_t = preferences == null ? void 0 : preferences.set) == null ? void 0 : _t.call(preferences, "overlayBgColor", app.bgColor);
-      if (typeof app.bgOpacity === "number") (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "overlayBgOpacity", app.bgOpacity);
-      if (app.textColor) (_v = preferences == null ? void 0 : preferences.set) == null ? void 0 : _v.call(preferences, "overlayTextColor", app.textColor);
-      if (typeof app.showTranslit === "boolean") (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "showTransliteration", app.showTranslit);
-      if (app.placement) (_x = preferences == null ? void 0 : preferences.set) == null ? void 0 : _x.call(preferences, "overlayPlacement", app.placement);
-      if (typeof app.customOffset === "number") (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "overlayCustomOffset", app.customOffset);
-      if (app.overlayDock) (_z = preferences == null ? void 0 : preferences.set) == null ? void 0 : _z.call(preferences, "overlayDock", app.overlayDock);
+      if (app.fontSize) (_t = preferences == null ? void 0 : preferences.set) == null ? void 0 : _t.call(preferences, "overlayFontSize", app.fontSize);
+      if (app.bgColor) (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "overlayBgColor", app.bgColor);
+      if (typeof app.bgOpacity === "number") (_v = preferences == null ? void 0 : preferences.set) == null ? void 0 : _v.call(preferences, "overlayBgOpacity", app.bgOpacity);
+      if (app.textColor) (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "overlayTextColor", app.textColor);
+      if (typeof app.showTranslit === "boolean") (_x = preferences == null ? void 0 : preferences.set) == null ? void 0 : _x.call(preferences, "showTransliteration", app.showTranslit);
+      if (app.placement) (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "overlayPlacement", app.placement);
+      if (typeof app.customOffset === "number") (_z = preferences == null ? void 0 : preferences.set) == null ? void 0 : _z.call(preferences, "overlayCustomOffset", app.customOffset);
+      if (app.overlayDock) (_A = preferences == null ? void 0 : preferences.set) == null ? void 0 : _A.call(preferences, "overlayDock", app.overlayDock);
     }
-    (_A = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _A.call(preferences);
+    (_B = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _B.call(preferences);
     appearanceSettingsCache = null;
     applyAppearanceSettings();
     syncNativeSubtitleVisibility();
@@ -1069,10 +1119,10 @@
     buildMenu();
   }
   function savePreset(slot, name) {
-    var _a4;
+    var _a5;
     const presets = getPresets();
     presets[slot] = {
-      name: name || ((_a4 = presets[slot]) == null ? void 0 : _a4.name) || `Preset ${slot}`,
+      name: name || ((_a5 = presets[slot]) == null ? void 0 : _a5.name) || `Preset ${slot}`,
       settings: getCurrentSettingsSnapshot(),
       updatedAt: Date.now()
     };
@@ -1094,7 +1144,7 @@
     core.osd(`POLYSCRIPT: Applied ${preset.name || `Preset ${slot}`}`, 2e3);
   }
   function updateRecentLangs(code) {
-    var _a4;
+    var _a5;
     if (!preferences || typeof preferences.set !== "function") return;
     let recent = Array.isArray(recentLangsCache) ? [...recentLangsCache] : [];
     recent = recent.filter((c) => c && c !== code);
@@ -1102,7 +1152,7 @@
     recent = recent.slice(0, RECENT_LANG_LIMIT);
     recentLangsCache = recent;
     preferences.set("psRecentLangs", JSON.stringify(recent));
-    (_a4 = preferences.sync) == null ? void 0 : _a4.call(preferences);
+    (_a5 = preferences.sync) == null ? void 0 : _a5.call(preferences);
   }
   function isSegmentationEnabled() {
     return segmentationEnabledSetting;
@@ -1145,6 +1195,10 @@
         bottom: 60px;
         left: 0;
         right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
         text-align: center;
         font: ${preset.primary} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: ${settings.textColor};
@@ -1167,6 +1221,13 @@
         background: rgba(${settings.bgColor}, ${Math.min(1, settings.bgOpacity + 0.12)});
         box-shadow: 0 0 0 1px rgba(255,255,255,0.2) inset;
       }
+      .ps-line-source {
+        font: ${preset.secondary} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: rgba(255, 255, 255, 0.9);
+        background: rgba(${settings.bgColor}, ${Math.max(0.18, settings.bgOpacity * 0.68)});
+        margin: 0 auto;
+        opacity: 0.92;
+      }
       .ps-word-container {
         display: inline-flex;
         flex-direction: column;
@@ -1174,6 +1235,16 @@
         margin: 0 2px;
         vertical-align: bottom;
         position: relative;
+        pointer-events: auto;
+      }
+      .ps-word-container[data-open="true"]::before {
+        content: "";
+        position: absolute;
+        left: -18px;
+        right: -18px;
+        bottom: 100%;
+        height: 18px;
+        pointer-events: auto;
       }
       .ps-transliteration {
         font-size: ${preset.translit};
@@ -1207,16 +1278,29 @@
         line-height: 1.3;
         min-width: 180px;
         max-width: 320px;
+        max-height: min(62vh, 520px);
         opacity: 0;
+        visibility: hidden;
         pointer-events: none;
-        transition: opacity 0.12s ease;
+        overflow: auto;
+        transition: opacity 0.14s ease, visibility 0.14s ease;
         z-index: 9999;
         text-align: left;
         border: 1px solid rgba(148, 163, 184, 0.35);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        overscroll-behavior: contain;
       }
-      .ps-word-container:hover .ps-tooltip {
+      .ps-tooltip * {
+        pointer-events: auto;
+      }
+      .ps-word-container[data-open="true"] .ps-tooltip {
         opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      .ps-word-container[data-open="true"] .ps-word {
+        background: rgba(255,255,255,0.2);
+        color: #4ade80;
       }
       .ps-dict-word {
         font-size: 14px;
@@ -1262,6 +1346,141 @@
         font-weight: 600;
         margin-top: 4px;
       }
+      .ps-dict-morphology {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+      }
+      .ps-dict-lemma {
+        font-size: 12px;
+        font-weight: 700;
+        color: #f8fafc;
+      }
+      .ps-dict-morph-summary {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #cbd5f5;
+        line-height: 1.4;
+      }
+      .ps-dict-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .ps-dict-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(99, 102, 241, 0.18);
+        color: #c7d2fe;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+      .ps-dict-note {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #94a3b8;
+        line-height: 1.4;
+      }
+      .ps-dict-paradigm {
+        margin-top: 8px;
+        padding: 8px 9px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        overflow-x: auto;
+      }
+      .ps-dict-paradigm-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: #93c5fd;
+        margin-bottom: 6px;
+      }
+      .ps-dict-paradigm-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+        color: #e5e7eb;
+      }
+      .ps-dict-paradigm-table th,
+      .ps-dict-paradigm-table td {
+        padding: 4px 5px;
+        text-align: left;
+        vertical-align: top;
+        border-top: 1px solid rgba(148, 163, 184, 0.16);
+        min-width: 54px;
+      }
+      .ps-dict-paradigm-table thead th {
+        border-top: none;
+        color: #94a3b8;
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .ps-dict-paradigm-table tbody th {
+        color: #cbd5f5;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .ps-dict-details {
+        margin-top: 8px;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+        padding-top: 8px;
+      }
+      .ps-dict-details > summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        color: #c7d2fe;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ps-dict-details > summary::-webkit-details-marker {
+        display: none;
+      }
+      .ps-dict-details > summary::before {
+        content: "\u25B8";
+        font-size: 11px;
+        color: #93c5fd;
+        transition: transform 120ms ease;
+      }
+      .ps-dict-details[open] > summary::before {
+        transform: rotate(90deg);
+      }
+      .ps-dict-details-body {
+        margin-top: 8px;
+      }
+      .ps-dict-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .ps-dict-link {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        color: #e2e8f0;
+        font-size: 10px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .ps-dict-link:hover {
+        background: rgba(99, 102, 241, 0.18);
+        border-color: rgba(129, 140, 248, 0.42);
+        color: #ffffff;
+      }
       .ps-muted { color: #aaa; }
     `);
   }
@@ -1274,23 +1493,52 @@
     lineTranslationPending.clear();
     lineTranslationQueue.length = 0;
     lineTranslationQueued.clear();
+    secondaryTranslationCache.clear();
+    secondaryTranslationPending.clear();
     lineTranslationGeneration += 1;
+    exactTimelineTranslationGeneration += 1;
+    exactTimelineTranslationJobKey = "";
+    exactTimelineTranslationActive = false;
+    exactTimelineWindowGeneration += 1;
+    exactTimelineWindowAnchorIndex = -1;
+    exactTimelineWindowActive = false;
+    exactTimelineFullFileTranslationRequestKey = "";
+    if (Array.isArray(subtitleEntries)) {
+      subtitleEntries.forEach((entry) => {
+        if (entry && typeof entry === "object") {
+          delete entry.translatedContent;
+        }
+      });
+    }
     lastRenderedText = "";
+    lastRenderedSourceText = "";
+    lastRenderedCueToken = "";
     lastOriginalText = "";
+    lastOriginalCueToken = "";
+    lastOriginalSourceText = "";
     showedLineTranslateOsd = false;
     usingNativeTargetSubs = false;
   }
-  function scheduleRender(text) {
+  function scheduleRender(text, options = {}) {
     if (!text) return;
+    const textString = String(text || "");
     pendingRenderText = text;
+    pendingRenderSourceText = typeof options.sourceText === "string" ? options.sourceText : textString === lastRenderedText ? lastRenderedSourceText : "";
+    pendingRenderCueToken = typeof options.cueToken === "string" ? options.cueToken : textString === lastRenderedText ? lastRenderedCueToken : "";
     if (renderScheduled) return;
     renderScheduled = true;
+    const delayMs = hasExactSubtitleTimeline() ? 0 : 80;
     setTimeout(() => {
       renderScheduled = false;
       const toRender = pendingRenderText;
+      const sourceText = pendingRenderSourceText;
+      const cueToken = pendingRenderCueToken;
       pendingRenderText = null;
-      if (toRender) renderSubtitleOverlay(toRender);
-    }, 80);
+      pendingRenderSourceText = "";
+      pendingRenderCueToken = "";
+      if (cueToken && cueToken !== subLastDisplayedCueToken) return;
+      if (toRender) renderSubtitleOverlay(toRender, sourceText, { cueToken });
+    }, delayMs);
   }
   function scheduleDictionaryOverlayRefresh() {
     if (!lastRenderedText) return;
@@ -1354,15 +1602,15 @@
     buildMenu();
   }
   function promptSetLlmTargetLang() {
-    var _a4;
-    const lang = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "LLM target language (e.g., Ancient Greek)", llmCustomTarget || targetLang);
+    var _a5;
+    const lang = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "LLM target language (e.g., Ancient Greek)", llmCustomTarget || targetLang);
     if (lang == null) return;
     setLlmTargetLang(lang.trim());
   }
   function setLlmTargetLang(lang) {
-    var _a4, _b;
+    var _a5, _b;
     llmCustomTarget = (lang || "").trim();
-    (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "llmCustomTarget", llmCustomTarget);
+    (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "llmCustomTarget", llmCustomTarget);
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
     clearTranslationCaches();
     usingFullFileTranslation = false;
@@ -1567,8 +1815,31 @@
     return candidate && typeof candidate.id === "number" ? candidate : null;
   }
   function syncSourceSubtitleTrack() {
-    const shouldShowSource = polyscriptEnabled && showSourceSubtitles && (usingFullFileTranslation || usingNativeTargetSubs);
+    const shouldShowSource = polyscriptEnabled && (showSourceSubtitles || !!getSecondaryTargetLang());
     if (!shouldShowSource) {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
+      lastSourceOverlayText = "";
+      setSecondarySubtitleTrack("no");
+      safeSetBoolean("secondary-sub-visibility", false);
+      return;
+    }
+    if (hasExactSubtitleTimeline()) {
+      void ensureSourceSubtitleEntries().then((ok) => {
+        if (ok && lastRenderedText) {
+          scheduleRender(lastRenderedText);
+        }
+      }).catch(() => {
+      });
+      setSecondarySubtitleTrack("no");
+      safeSetBoolean("secondary-sub-visibility", false);
+      return;
+    }
+    if (!usingFullFileTranslation && !usingNativeTargetSubs) {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
       setSecondarySubtitleTrack("no");
       safeSetBoolean("secondary-sub-visibility", false);
       return;
@@ -1594,12 +1865,30 @@
     safeSetBoolean("secondary-sub-visibility", true);
   }
   function shouldHideNativeSubtitleRendering() {
-    return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && (usingFullFileTranslation && !!(subtitleEntries == null ? void 0 : subtitleEntries.length) || usingNativeTargetSubs && !!(subtitleEntries == null ? void 0 : subtitleEntries.length));
+    return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && !hasExactSubtitleTimeline() && (usingFullFileTranslation && !!(subtitleEntries == null ? void 0 : subtitleEntries.length) || usingNativeTargetSubs && !!(subtitleEntries == null ? void 0 : subtitleEntries.length) || false);
   }
   function shouldUseTransparentPrimarySuppression() {
-    return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && !showSourceSubtitles && (usingNativeTargetSubs && !(subtitleEntries == null ? void 0 : subtitleEntries.length) || !usingNativeTargetSubs && !usingFullFileTranslation);
+    return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && (hasExactSubtitleTimeline() || usingNativeTargetSubs && !(subtitleEntries == null ? void 0 : subtitleEntries.length) || !usingNativeTargetSubs && !usingFullFileTranslation);
   }
   function syncNativeSubtitleVisibility() {
+    if (hasExactSubtitleTimeline() && overlayLoaded && hideNativeSubtitleRendering) {
+      if (lastNativeSubtitleSuppressionMode !== "transparent-primary-exact") {
+        console.log("POLYSCRIPT: Native subtitle suppression mode=transparent-primary-exact");
+        lastNativeSubtitleSuppressionMode = "transparent-primary-exact";
+      }
+      restoreSubVisibility();
+      capturePrimarySubStyle();
+      safeSetString("sub-color", "1/1/1/0");
+      safeSetString("sub-outline-color", "0/0/0/0");
+      safeSetString("sub-border-color", "0/0/0/0");
+      safeSetString("sub-back-color", "0/0/0/0");
+      safeSetString("sub-shadow-color", "0/0/0/0");
+      safeSetNumber("sub-outline-size", 0);
+      safeSetNumber("sub-border-size", 0);
+      safeSetBoolean("secondary-sub-visibility", false);
+      syncSourceSubtitleTrack();
+      return;
+    }
     if (shouldHideNativeSubtitleRendering()) {
       if (lastNativeSubtitleSuppressionMode !== "visibility") {
         console.log("POLYSCRIPT: Native subtitle suppression mode=visibility");
@@ -1664,11 +1953,11 @@
     return { ...ttsVoiceMapCache };
   }
   function saveTtsVoiceMap(map) {
-    var _a4;
+    var _a5;
     if (!(preferences == null ? void 0 : preferences.set)) return;
     ttsVoiceMapCache = parseTtsVoiceMap(map);
     preferences.set("ttsVoiceMap", JSON.stringify(map));
-    (_a4 = preferences.sync) == null ? void 0 : _a4.call(preferences);
+    (_a5 = preferences.sync) == null ? void 0 : _a5.call(preferences);
   }
   function getVoicePreferenceKey() {
     if (llmCustomTarget) {
@@ -1732,11 +2021,11 @@
     return String(map[key] || "").trim();
   }
   function setMappedVoiceForCurrentTarget(nextVoice) {
-    var _a4;
+    var _a5;
     const key = getVoicePreferenceKey();
     const voice = String(nextVoice || "").trim();
     if (!key) {
-      (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsVoice", voice);
+      (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsVoice", voice);
       return;
     }
     const map = getTtsVoiceMap();
@@ -1831,11 +2120,11 @@
     };
   }
   function applyVoiceSelectorChoice(rawValue) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D;
     const value = String(rawValue || "").trim();
     if (!value) return;
     if (value === VOICE_CHOICE_AUTO) {
-      (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEnabled", true);
+      (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsEnabled", true);
       (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsEngine", "say");
       (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "ttsAutoVoice", true);
       (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "ttsPreferPersonal", false);
@@ -2085,20 +2374,20 @@
     }
   }
   async function fetchPersonalVoiceStatus() {
-    var _a4;
+    var _a5;
     const settings = getTtsSettings();
     const ready = await ensureNativeHelperReady();
     if (!ready) return null;
     try {
       const resp = await safeHttpGet(`${settings.nativeBaseUrl}/personal-voice-status`, { timeout: 1.5 });
       if (resp.statusCode && resp.statusCode >= 400) return null;
-      return ((_a4 = resp.data) == null ? void 0 : _a4.status) || null;
+      return ((_a5 = resp.data) == null ? void 0 : _a5.status) || null;
     } catch {
       return null;
     }
   }
   async function requestPersonalVoiceAccess() {
-    var _a4;
+    var _a5;
     const settings = getTtsSettings();
     const ready = await ensureNativeHelperReady();
     if (!ready) {
@@ -2111,7 +2400,7 @@
         data: {},
         timeout: 3
       });
-      const status = ((_a4 = resp.data) == null ? void 0 : _a4.status) || "unknown";
+      const status = ((_a5 = resp.data) == null ? void 0 : _a5.status) || "unknown";
       core.osd(`POLYSCRIPT: Personal Voice ${status}`, 2e3);
       if (status === "authorized") {
         refreshNativeVoices(true);
@@ -2392,16 +2681,16 @@
     return savedLoginEmailCache;
   }
   function saveLoginEmail(email) {
-    var _a4, _b;
+    var _a5, _b;
     const normalized = String(email || "").trim();
     savedLoginEmailCache = normalized;
-    (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "polyscriptLoginEmail", normalized);
+    (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "polyscriptLoginEmail", normalized);
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
   }
   function setPolyscriptToken(token) {
-    var _a4;
+    var _a5;
     polyscriptToken = String(token || "").trim();
-    (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "polyscriptToken", polyscriptToken);
+    (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "polyscriptToken", polyscriptToken);
     if (polyscriptToken) {
       stopDeviceLoginFlow();
     }
@@ -2988,12 +3277,12 @@
         reject(new Error(message));
       };
       const succeed = (socket2) => {
-        var _a4;
+        var _a5;
         if (settled) return;
         settled = true;
         if (timeoutHandle) clearTimeout(timeoutHandle);
         try {
-          (_a4 = socket2 == null ? void 0 : socket2.close) == null ? void 0 : _a4.call(socket2);
+          (_a5 = socket2 == null ? void 0 : socket2.close) == null ? void 0 : _a5.call(socket2);
         } catch {
         }
         if (!chunks.length) {
@@ -3365,7 +3654,7 @@ ws.onmessage = (event) => {
     }
   }
   async function speakTextCloud(text, settings) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h;
+    var _a5, _b, _c, _d, _e, _f, _g, _h;
     if (!http) return { ok: false, reason: "http_unavailable", message: "POLYSCRIPT: Cloud TTS unavailable (HTTP unavailable), using fallback" };
     const fail = (reason, message, extra = {}) => ({ ok: false, reason, message, ...extra });
     const token = await getValidPolyscriptToken();
@@ -3509,7 +3798,7 @@ ws.onmessage = (event) => {
             source: "polyplugin",
             language: language || null,
             voice_name: voiceName,
-            ttfb_ms: (_b = (_a4 = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _a4.ttfbMs) != null ? _b : null,
+            ttfb_ms: (_b = (_a5 = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _a5.ttfbMs) != null ? _b : null,
             elapsed_ms: (_d = (_c = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _c.elapsedMs) != null ? _d : Date.now() - startedAt,
             chunks: (_f = (_e = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _e.chunkCount) != null ? _f : null,
             audio_bytes: (_h = (_g = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _g.audioBytes) != null ? _h : null
@@ -3807,7 +4096,7 @@ ws.onmessage = (event) => {
     clearSentenceAutoResume(false);
     const delayMs = Math.max(0, settings.delay * 1e3);
     sentenceResumeTimer = setTimeout(() => {
-      var _a4;
+      var _a5;
       if (token !== sentencePauseToken) return;
       if (!sentenceMode) return;
       if (!sentencePausedByPlugin) return;
@@ -3815,14 +4104,14 @@ ws.onmessage = (event) => {
         sentencePausedByPlugin = false;
         return;
       }
-      (_a4 = core.resume) == null ? void 0 : _a4.call(core);
+      (_a5 = core.resume) == null ? void 0 : _a5.call(core);
       sentencePausedByPlugin = false;
     }, delayMs);
   }
   function setPolyscriptEnabled(nextEnabled) {
-    var _a4, _b, _c, _d, _e, _f;
+    var _a5, _b, _c, _d, _e, _f;
     polyscriptEnabled = !!nextEnabled;
-    (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "polyscriptEnabled", polyscriptEnabled);
+    (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "polyscriptEnabled", polyscriptEnabled);
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
     if (!polyscriptEnabled) {
       usingFullFileTranslation = false;
@@ -3884,6 +4173,7 @@ ws.onmessage = (event) => {
     const aiStatus = buildAiStatusSummary();
     return {
       targetLang,
+      secondaryTargetLang,
       translationProvider,
       llmMode,
       llmCustomTarget,
@@ -3939,14 +4229,14 @@ ws.onmessage = (event) => {
     }
   }
   function applySidebarLanguageDrafts(payload = {}) {
-    var _a4, _b, _c;
+    var _a5, _b, _c;
     let changed = false;
     let targetChanged = false;
     const nextCustomTarget = typeof payload.llmCustomTarget === "string" ? String(payload.llmCustomTarget || "").trim() : null;
     const nextMetaPrompt = typeof payload.llmMetaPrompt === "string" ? String(payload.llmMetaPrompt || "") : null;
     if (nextCustomTarget != null && nextCustomTarget !== llmCustomTarget) {
       llmCustomTarget = nextCustomTarget;
-      (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "llmCustomTarget", llmCustomTarget);
+      (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "llmCustomTarget", llmCustomTarget);
       changed = true;
       targetChanged = true;
     }
@@ -3964,16 +4254,31 @@ ws.onmessage = (event) => {
     return changed;
   }
   function applySidebarSetting(key, value) {
-    var _a4, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa;
     switch (key) {
       case "targetLang":
         setTargetLang(value);
         void refreshSidebarVoiceData(true);
         return;
+      case "secondaryTargetLang":
+        secondaryTargetLang = String(value || "").trim();
+        (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "secondaryTargetLang", secondaryTargetLang);
+        (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
+        secondaryTranslationCache.clear();
+        secondaryTranslationPending.clear();
+        if (lastRenderedText) {
+          scheduleRender(lastRenderedText, {
+            sourceText: getCachedSecondarySubtitleText(lastOriginalSourceText || lastOriginalText, lastRenderedText),
+            cueToken: subLastDisplayedCueToken
+          });
+        }
+        emitSidebarSettings({ skipAutoAiRefresh: true });
+        buildMenu();
+        return;
       case "translationProvider":
         translationProvider = value === "polyscript" ? "polyscript" : "google";
-        (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "translationProvider", translationProvider);
-        (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
+        (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "translationProvider", translationProvider);
+        (_d = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _d.call(preferences);
         clearTranslationCaches();
         usingFullFileTranslation = false;
         subtitleEntries = null;
@@ -3987,8 +4292,8 @@ ws.onmessage = (event) => {
       case "llmMode":
         if (LLM_MODES[value]) {
           llmMode = value;
-          (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "llmMode", llmMode);
-          (_d = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _d.call(preferences);
+          (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "llmMode", llmMode);
+          (_f = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _f.call(preferences);
           clearTranslationCaches();
           usingFullFileTranslation = false;
           subtitleEntries = null;
@@ -4003,20 +4308,20 @@ ws.onmessage = (event) => {
         return;
       case "llmMetaPrompt":
         llmMetaPrompt = String(value || "");
-        (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "llmMetaPrompt", llmMetaPrompt);
-        (_f = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _f.call(preferences);
+        (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "llmMetaPrompt", llmMetaPrompt);
+        (_h = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _h.call(preferences);
         return;
       case "llmModel":
         llmModel = String(value || llmModel);
-        (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "llmModel", llmModel);
-        (_h = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _h.call(preferences);
+        (_i = preferences == null ? void 0 : preferences.set) == null ? void 0 : _i.call(preferences, "llmModel", llmModel);
+        (_j = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _j.call(preferences);
         return;
       case "llmTemperature": {
         const num = Number(value);
         if (!Number.isNaN(num)) {
           llmTemperature = Math.max(0, Math.min(1, num));
-          (_i = preferences == null ? void 0 : preferences.set) == null ? void 0 : _i.call(preferences, "llmTemperature", llmTemperature);
-          (_j = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _j.call(preferences);
+          (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "llmTemperature", llmTemperature);
+          (_l = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _l.call(preferences);
         }
         return;
       }
@@ -4024,15 +4329,15 @@ ws.onmessage = (event) => {
         const num = Number(value);
         if (!Number.isNaN(num)) {
           llmMaxTokens = Math.max(256, num);
-          (_k = preferences == null ? void 0 : preferences.set) == null ? void 0 : _k.call(preferences, "llmMaxTokens", llmMaxTokens);
-          (_l = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _l.call(preferences);
+          (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "llmMaxTokens", llmMaxTokens);
+          (_n = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _n.call(preferences);
         }
         return;
       }
       case "sentenceMode":
         if (value) {
           ensureSentenceEntries().then((ok) => {
-            var _a5, _b2;
+            var _a6, _b2;
             if (!ok) {
               sentenceLiveMode = true;
               sentenceLiveIndex = 0;
@@ -4040,7 +4345,7 @@ ws.onmessage = (event) => {
               core.osd("POLYSCRIPT: Sentence mode using live timing", 2e3);
             }
             sentenceMode = true;
-            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "sentenceMode", true);
+            (_a6 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a6.call(preferences, "sentenceMode", true);
             (_b2 = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b2.call(preferences);
             lastSentenceIndex = -1;
             lastPausedSentenceIndex = -1;
@@ -4053,26 +4358,26 @@ ws.onmessage = (event) => {
         sentenceMode = false;
         sentenceLiveMode = false;
         sentenceLivePendingAccept = false;
-        (_m = preferences == null ? void 0 : preferences.set) == null ? void 0 : _m.call(preferences, "sentenceMode", false);
-        (_n = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _n.call(preferences);
+        (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "sentenceMode", false);
+        (_p = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _p.call(preferences);
         clearSentenceAutoResume();
         buildMenu();
         return;
       case "sentenceAutoResume":
-        (_o = preferences == null ? void 0 : preferences.set) == null ? void 0 : _o.call(preferences, "sentenceAutoResume", coerceBoolean(value, false));
-        (_p = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _p.call(preferences);
+        (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "sentenceAutoResume", coerceBoolean(value, false));
+        (_r = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _r.call(preferences);
         return;
       case "sentenceAutoResumeDelay": {
         const num = Number(value);
         if (!Number.isNaN(num)) {
-          (_q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _q.call(preferences, "sentenceAutoResumeDelay", Math.max(0, Math.min(15, num)));
-          (_r = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _r.call(preferences);
+          (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "sentenceAutoResumeDelay", Math.max(0, Math.min(15, num)));
+          (_t = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _t.call(preferences);
         }
         return;
       }
       case "sentenceTtsOnPause":
-        (_s = preferences == null ? void 0 : preferences.set) == null ? void 0 : _s.call(preferences, "sentenceTtsOnPause", coerceBoolean(value, false));
-        (_t = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _t.call(preferences);
+        (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "sentenceTtsOnPause", coerceBoolean(value, false));
+        (_v = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _v.call(preferences);
         return;
       case "loginEmail":
         saveLoginEmail(value || "");
@@ -4112,104 +4417,111 @@ ws.onmessage = (event) => {
         return;
       case "segmentationEnabled":
         segmentationEnabledSetting = coerceBoolean(value, segmentationEnabledSetting);
-        (_u = preferences == null ? void 0 : preferences.set) == null ? void 0 : _u.call(preferences, "segmentationEnabled", segmentationEnabledSetting);
-        (_v = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _v.call(preferences);
+        (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "segmentationEnabled", segmentationEnabledSetting);
+        (_x = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _x.call(preferences);
         if (lastRenderedText) scheduleRender(lastRenderedText);
         return;
       case "hideNativeSubtitleRendering":
         hideNativeSubtitleRendering = true;
-        (_w = preferences == null ? void 0 : preferences.set) == null ? void 0 : _w.call(preferences, "hideNativeSubtitleRendering", true);
-        (_x = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _x.call(preferences);
+        (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "hideNativeSubtitleRendering", true);
+        (_z = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _z.call(preferences);
         syncNativeSubtitleVisibility();
         buildMenu();
         return;
       case "showSourceSubtitles":
         showSourceSubtitles = coerceBoolean(value, showSourceSubtitles);
-        (_y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _y.call(preferences, "showSourceSubtitles", showSourceSubtitles);
-        (_z = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _z.call(preferences);
+        (_A = preferences == null ? void 0 : preferences.set) == null ? void 0 : _A.call(preferences, "showSourceSubtitles", showSourceSubtitles);
+        (_B = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _B.call(preferences);
         syncNativeSubtitleVisibility();
+        if (lastRenderedText) {
+          scheduleRender(lastRenderedText, {
+            sourceText: showSourceSubtitles ? lastOriginalSourceText || lastSourceOverlayText : "",
+            cueToken: subLastDisplayedCueToken
+          });
+        }
         emitSidebarSettings({ skipAutoAiRefresh: true });
+        buildMenu();
         return;
       case "showOriginalTranscript":
         showOriginalTranscript = coerceBoolean(value, showOriginalTranscript);
-        (_A = preferences == null ? void 0 : preferences.set) == null ? void 0 : _A.call(preferences, "showOriginalTranscript", showOriginalTranscript);
-        (_B = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _B.call(preferences);
+        (_C = preferences == null ? void 0 : preferences.set) == null ? void 0 : _C.call(preferences, "showOriginalTranscript", showOriginalTranscript);
+        (_D = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _D.call(preferences);
         emitSidebarSettings({ skipAutoAiRefresh: true });
         return;
       case "autoArrangeSubs":
         autoArrangeSubsSetting = coerceBoolean(value, autoArrangeSubsSetting);
-        (_C = preferences == null ? void 0 : preferences.set) == null ? void 0 : _C.call(preferences, "autoArrangeSubs", autoArrangeSubsSetting);
-        (_D = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _D.call(preferences);
+        (_E = preferences == null ? void 0 : preferences.set) == null ? void 0 : _E.call(preferences, "autoArrangeSubs", autoArrangeSubsSetting);
+        (_F = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _F.call(preferences);
         applySubtitleLayout();
         return;
       case "primarySubPosition":
         primarySubPositionSetting = value === "top" ? "top" : "bottom";
-        (_E = preferences == null ? void 0 : preferences.set) == null ? void 0 : _E.call(preferences, "primarySubPosition", value === "top" ? "top" : "bottom");
-        (_F = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _F.call(preferences);
+        (_G = preferences == null ? void 0 : preferences.set) == null ? void 0 : _G.call(preferences, "primarySubPosition", value === "top" ? "top" : "bottom");
+        (_H = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _H.call(preferences);
         applySubtitleLayout();
         return;
       case "secondarySubPosition":
         secondarySubPositionSetting = value === "top" ? "top" : "bottom";
-        (_G = preferences == null ? void 0 : preferences.set) == null ? void 0 : _G.call(preferences, "secondarySubPosition", value === "top" ? "top" : "bottom");
-        (_H = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _H.call(preferences);
+        (_I = preferences == null ? void 0 : preferences.set) == null ? void 0 : _I.call(preferences, "secondarySubPosition", value === "top" ? "top" : "bottom");
+        (_J = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _J.call(preferences);
         applySubtitleLayout();
         return;
       case "ttsEnabled":
-        (_I = preferences == null ? void 0 : preferences.set) == null ? void 0 : _I.call(preferences, "ttsEnabled", coerceBoolean(value, true));
-        (_J = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _J.call(preferences);
-        return;
-      case "ttsOnWordClick":
-        (_K = preferences == null ? void 0 : preferences.set) == null ? void 0 : _K.call(preferences, "ttsOnWordClick", coerceBoolean(value, true));
+        (_K = preferences == null ? void 0 : preferences.set) == null ? void 0 : _K.call(preferences, "ttsEnabled", coerceBoolean(value, true));
         (_L = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _L.call(preferences);
         return;
-      case "ttsOnLineClick":
-        (_M = preferences == null ? void 0 : preferences.set) == null ? void 0 : _M.call(preferences, "ttsOnLineClick", coerceBoolean(value, true));
+      case "ttsOnWordClick":
+        (_M = preferences == null ? void 0 : preferences.set) == null ? void 0 : _M.call(preferences, "ttsOnWordClick", coerceBoolean(value, true));
         (_N = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _N.call(preferences);
+        return;
+      case "ttsOnLineClick":
+        (_O = preferences == null ? void 0 : preferences.set) == null ? void 0 : _O.call(preferences, "ttsOnLineClick", coerceBoolean(value, true));
+        (_P = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _P.call(preferences);
         return;
       case "ttsRate": {
         const num = Number(value);
         if (!Number.isNaN(num)) {
-          (_O = preferences == null ? void 0 : preferences.set) == null ? void 0 : _O.call(preferences, "ttsRate", Math.max(100, Math.min(400, num)));
-          (_P = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _P.call(preferences);
+          (_Q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Q.call(preferences, "ttsRate", Math.max(100, Math.min(400, num)));
+          (_R = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _R.call(preferences);
         }
         return;
       }
       case "ttsVoice":
-        (_Q = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Q.call(preferences, "ttsVoice", String(value || ""));
+        (_S = preferences == null ? void 0 : preferences.set) == null ? void 0 : _S.call(preferences, "ttsVoice", String(value || ""));
         setMappedVoiceForCurrentTarget(String(value || ""));
-        (_R = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _R.call(preferences);
+        (_T = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _T.call(preferences);
         return;
       case "ttsVoiceSelector":
         applyVoiceSelectorChoice(value);
         return;
       case "ttsAutoVoice":
-        (_S = preferences == null ? void 0 : preferences.set) == null ? void 0 : _S.call(preferences, "ttsAutoVoice", coerceBoolean(value, false));
-        (_T = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _T.call(preferences);
+        (_U = preferences == null ? void 0 : preferences.set) == null ? void 0 : _U.call(preferences, "ttsAutoVoice", coerceBoolean(value, false));
+        (_V = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _V.call(preferences);
         return;
       case "ttsEngine":
-        (_U = preferences == null ? void 0 : preferences.set) == null ? void 0 : _U.call(preferences, "ttsEngine", value === "native" ? "native" : value === "cloud" ? "cloud" : "say");
-        (_V = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _V.call(preferences);
+        (_W = preferences == null ? void 0 : preferences.set) == null ? void 0 : _W.call(preferences, "ttsEngine", value === "native" ? "native" : value === "cloud" ? "cloud" : "say");
+        (_X = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _X.call(preferences);
         buildMenu();
         return;
       case "ttsNativeBaseUrl":
-        (_W = preferences == null ? void 0 : preferences.set) == null ? void 0 : _W.call(preferences, "ttsNativeBaseUrl", normalizeServiceBaseUrl(value, DEFAULT_NATIVE_BASE_URL));
-        (_X = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _X.call(preferences);
-        return;
-      case "ttsNativeHelperPath":
-        (_Y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Y.call(preferences, "ttsNativeHelperPath", String(value || "").trim());
+        (_Y = preferences == null ? void 0 : preferences.set) == null ? void 0 : _Y.call(preferences, "ttsNativeBaseUrl", normalizeServiceBaseUrl(value, DEFAULT_NATIVE_BASE_URL));
         (_Z = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _Z.call(preferences);
         return;
-      case "ttsNativeAutoStart":
-        (__ = preferences == null ? void 0 : preferences.set) == null ? void 0 : __.call(preferences, "ttsNativeAutoStart", coerceBoolean(value, true));
+      case "ttsNativeHelperPath":
+        (__ = preferences == null ? void 0 : preferences.set) == null ? void 0 : __.call(preferences, "ttsNativeHelperPath", String(value || "").trim());
         (_$ = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _$.call(preferences);
         return;
-      case "ttsPreferPersonal":
-        (_aa = preferences == null ? void 0 : preferences.set) == null ? void 0 : _aa.call(preferences, "ttsPreferPersonal", coerceBoolean(value, true));
+      case "ttsNativeAutoStart":
+        (_aa = preferences == null ? void 0 : preferences.set) == null ? void 0 : _aa.call(preferences, "ttsNativeAutoStart", coerceBoolean(value, true));
         (_ba = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _ba.call(preferences);
         return;
-      case "ttsNativeEngine":
-        (_ca = preferences == null ? void 0 : preferences.set) == null ? void 0 : _ca.call(preferences, "ttsNativeEngine", value === "av" ? "av" : "nss");
+      case "ttsPreferPersonal":
+        (_ca = preferences == null ? void 0 : preferences.set) == null ? void 0 : _ca.call(preferences, "ttsPreferPersonal", coerceBoolean(value, true));
         (_da = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _da.call(preferences);
+        return;
+      case "ttsNativeEngine":
+        (_ea = preferences == null ? void 0 : preferences.set) == null ? void 0 : _ea.call(preferences, "ttsNativeEngine", value === "av" ? "av" : "nss");
+        (_fa = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _fa.call(preferences);
         nativeVoices = [];
         nativeVoicesAt = 0;
         buildMenu();
@@ -4484,7 +4796,7 @@ ws.onmessage = (event) => {
     }
   }
   function handleSidebarAction(action, payload = {}) {
-    var _a4, _b, _c;
+    var _a5, _b, _c;
     switch (action) {
       case "applyLanguageDrafts": {
         const changed = applySidebarLanguageDrafts(payload);
@@ -4506,7 +4818,7 @@ ws.onmessage = (event) => {
         return;
       case "toggleSentence":
         sentenceMode = !sentenceMode;
-        (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "sentenceMode", sentenceMode);
+        (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "sentenceMode", sentenceMode);
         (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
         buildMenu();
         return;
@@ -4650,9 +4962,9 @@ ws.onmessage = (event) => {
     }
   }
   function toggleSentenceModeSimple() {
-    var _a4, _b;
+    var _a5, _b;
     sentenceMode = !sentenceMode;
-    (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "sentenceMode", sentenceMode);
+    (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "sentenceMode", sentenceMode);
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
     if (!sentenceMode) {
       sentenceLiveMode = false;
@@ -4664,10 +4976,10 @@ ws.onmessage = (event) => {
     emitSidebarSettings();
   }
   function toggleSpeakingModeSimple() {
-    var _a4, _b;
+    var _a5, _b;
     const settings = getTtsSettings();
     const next = !settings.enabled;
-    (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEnabled", next);
+    (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsEnabled", next);
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
     if (!next) {
       stopSpeaking();
@@ -4710,11 +5022,11 @@ ws.onmessage = (event) => {
     if (polyscriptToken) {
       menu.addItem(
         menu.item("Sign Out", () => {
-          var _a4;
+          var _a5;
           stopDeviceLoginFlow();
           setPolyscriptToken("");
           setAuthFlowState({ phase: "idle", message: "", verificationUrl: "" });
-          (_a4 = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _a4.call(preferences);
+          (_a5 = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _a5.call(preferences);
           core.osd("POLYSCRIPT: Signed out", 1500);
           emitSidebarSettings({ skipAutoAiRefresh: true });
           buildMenu();
@@ -4759,8 +5071,8 @@ ws.onmessage = (event) => {
       );
       menu.addItem(
         menu.item("Target Language...", () => {
-          var _a4;
-          const input = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Target language (name or code)", getLangLabel(targetLang));
+          var _a5;
+          const input = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Target language (name or code)", getLangLabel(targetLang));
           const resolved = resolveLanguageInput(input);
           if (!resolved) {
             core.osd("POLYSCRIPT: Language not found", 1500);
@@ -4771,9 +5083,9 @@ ws.onmessage = (event) => {
       );
       menu.addItem(
         menu.item(`Translation Provider (${translationProvider === "polyscript" ? "LLM" : "Google"})`, () => {
-          var _a4, _b;
+          var _a5, _b;
           translationProvider = translationProvider === "google" ? "polyscript" : "google";
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "translationProvider", translationProvider);
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "translationProvider", translationProvider);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           clearTranslationCaches();
           usingFullFileTranslation = false;
@@ -4793,7 +5105,7 @@ ws.onmessage = (event) => {
       const sentenceRoot = menu.item(`Sentence Mode (${sentenceMode ? "On" : "Off"})`);
       sentenceRoot.addSubMenuItem(
         menu.item(`Enable (${sentenceMode ? "On" : "Off"})`, async () => {
-          var _a4, _b;
+          var _a5, _b;
           if (!sentenceMode) {
             const ok = await ensureSentenceEntries();
             if (!ok) {
@@ -4804,7 +5116,7 @@ ws.onmessage = (event) => {
             }
           }
           sentenceMode = !sentenceMode;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "sentenceMode", sentenceMode);
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "sentenceMode", sentenceMode);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           lastSentenceIndex = -1;
           lastPausedSentenceIndex = -1;
@@ -4819,16 +5131,16 @@ ws.onmessage = (event) => {
       );
       sentenceRoot.addSubMenuItem(
         menu.item(`Auto Resume (${sentenceSettings.autoResume ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "sentenceAutoResume", !sentenceSettings.autoResume);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "sentenceAutoResume", !sentenceSettings.autoResume);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: sentenceSettings.autoResume })
       );
       sentenceRoot.addSubMenuItem(
         menu.item(`Auto Resume Delay (${sentenceSettings.delay}s)`, () => {
-          var _a4, _b, _c;
-          const next = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Auto resume delay (seconds)", String(sentenceSettings.delay));
+          var _a5, _b, _c;
+          const next = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Auto resume delay (seconds)", String(sentenceSettings.delay));
           const num = Number(next);
           if (!Number.isNaN(num)) {
             (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "sentenceAutoResumeDelay", Math.max(0, Math.min(15, num)));
@@ -4839,8 +5151,8 @@ ws.onmessage = (event) => {
       );
       sentenceRoot.addSubMenuItem(
         menu.item(`Speak Translation On Pause (${sentenceSettings.ttsOnPause ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "sentenceTtsOnPause", !sentenceSettings.ttsOnPause);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "sentenceTtsOnPause", !sentenceSettings.ttsOnPause);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: sentenceSettings.ttsOnPause })
@@ -4859,9 +5171,9 @@ ws.onmessage = (event) => {
       const quickRoot = menu.item("Quick Actions");
       quickRoot.addSubMenuItem(
         menu.item("Toggle Provider (Google/LLM)", () => {
-          var _a4, _b;
+          var _a5, _b;
           translationProvider = translationProvider === "google" ? "polyscript" : "google";
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "translationProvider", translationProvider);
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "translationProvider", translationProvider);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           clearTranslationCaches();
           usingFullFileTranslation = false;
@@ -4906,16 +5218,16 @@ ws.onmessage = (event) => {
       const engineRoot = menu.item(`TTS Engine (${engineLabel})`);
       engineRoot.addSubMenuItem(
         menu.item("macOS say (Built-in)", () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEngine", "say");
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsEngine", "say");
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.engine === "say" })
       );
       engineRoot.addSubMenuItem(
         menu.item("Native Helper (Personal Voice)", () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEngine", "native");
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsEngine", "native");
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.engine === "native" })
@@ -4923,9 +5235,9 @@ ws.onmessage = (event) => {
       engineRoot.addSubMenuItem(menu.separator());
       engineRoot.addSubMenuItem(
         menu.item("Set Helper Path...", () => {
-          var _a4, _b, _c;
+          var _a5, _b, _c;
           const current = ttsSettings.nativeHelperPath || "";
-          const next = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Path to PolyscriptTTSHelper", current);
+          const next = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Path to PolyscriptTTSHelper", current);
           if (next != null) {
             (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsNativeHelperPath", next.trim());
             (_c = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _c.call(preferences);
@@ -4935,8 +5247,8 @@ ws.onmessage = (event) => {
       );
       engineRoot.addSubMenuItem(
         menu.item(`Auto-Start Helper (${ttsSettings.nativeAutoStart ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsNativeAutoStart", !ttsSettings.nativeAutoStart);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsNativeAutoStart", !ttsSettings.nativeAutoStart);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.nativeAutoStart })
@@ -4955,8 +5267,8 @@ ws.onmessage = (event) => {
         const nativeEngineRoot = menu.item(`Native Engine (${ttsSettings.nativeEngine === "nss" ? "NSSpeechSynthesizer" : "AVSpeechSynthesizer"})`);
         nativeEngineRoot.addSubMenuItem(
           menu.item("NSSpeechSynthesizer (Personal Voice)", () => {
-            var _a4, _b;
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsNativeEngine", "nss");
+            var _a5, _b;
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsNativeEngine", "nss");
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             nativeVoices = [];
             nativeVoicesAt = 0;
@@ -4965,8 +5277,8 @@ ws.onmessage = (event) => {
         );
         nativeEngineRoot.addSubMenuItem(
           menu.item("AVSpeechSynthesizer", () => {
-            var _a4, _b;
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsNativeEngine", "av");
+            var _a5, _b;
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsNativeEngine", "av");
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             nativeVoices = [];
             nativeVoicesAt = 0;
@@ -4978,24 +5290,24 @@ ws.onmessage = (event) => {
       speechRoot.addSubMenuItem(engineRoot);
       speechRoot.addSubMenuItem(
         menu.item(`TTS Enabled (${ttsSettings.enabled ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsEnabled", !ttsSettings.enabled);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsEnabled", !ttsSettings.enabled);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.enabled })
       );
       speechRoot.addSubMenuItem(
         menu.item(`Speak On Word Click (${ttsSettings.wordClick ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsOnWordClick", !ttsSettings.wordClick);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsOnWordClick", !ttsSettings.wordClick);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.wordClick })
       );
       speechRoot.addSubMenuItem(
         menu.item(`Speak On Line Click (${ttsSettings.lineClick ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsOnLineClick", !ttsSettings.lineClick);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsOnLineClick", !ttsSettings.lineClick);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.lineClick })
@@ -5020,9 +5332,9 @@ ws.onmessage = (event) => {
       );
       speechRoot.addSubMenuItem(
         menu.item("Set TTS Rate...", () => {
-          var _a4, _b, _c;
+          var _a5, _b, _c;
           const current = String(ttsSettings.rate);
-          const next = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "TTS rate (words per minute)", current);
+          const next = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "TTS rate (words per minute)", current);
           const num = Number(next);
           if (!Number.isNaN(num)) {
             (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsRate", Math.max(100, Math.min(400, num)));
@@ -5033,10 +5345,10 @@ ws.onmessage = (event) => {
       );
       speechRoot.addSubMenuItem(
         menu.item("Set TTS Voice...", () => {
-          var _a4, _b, _c;
+          var _a5, _b, _c;
           const current = ttsSettings.voice || "";
           const engineHint = ttsSettings.engine === "native" ? "native voice name or identifier" : ttsSettings.engine === "cloud" ? "cloud voice name" : "macOS say -v voice";
-          const next = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, `TTS voice (${engineHint})`, current);
+          const next = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, `TTS voice (${engineHint})`, current);
           if (next != null) {
             (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsVoice", next.trim());
             (_c = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _c.call(preferences);
@@ -5046,8 +5358,8 @@ ws.onmessage = (event) => {
       );
       speechRoot.addSubMenuItem(
         menu.item(`Auto Select Voice (${ttsSettings.autoVoice ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsAutoVoice", !ttsSettings.autoVoice);
+          var _a5, _b;
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsAutoVoice", !ttsSettings.autoVoice);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: ttsSettings.autoVoice })
@@ -5122,12 +5434,12 @@ ws.onmessage = (event) => {
       }
       voiceForLangRoot.addSubMenuItem(
         menu.item("Set Voice by Name...", () => {
-          var _a4;
+          var _a5;
           if (!voiceKey) {
             core.osd("POLYSCRIPT: No language key available", 1500);
             return;
           }
-          const input = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Voice name or identifier", voiceForLang || "");
+          const input = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Voice name or identifier", voiceForLang || "");
           if (input == null) return;
           if (!voiceList.length) {
             const nextMap = getTtsVoiceMap();
@@ -5175,8 +5487,8 @@ ws.onmessage = (event) => {
             const label = `${voice.name}${voice.locale ? ` (${voice.locale})` : ""}`;
             voiceListRoot.addSubMenuItem(
               menu.item(label, () => {
-                var _a4, _b;
-                (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsVoice", voice.name);
+                var _a5, _b;
+                (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsVoice", voice.name);
                 (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
                 buildMenu();
               }, { selected: ttsSettings.voice === voice.name })
@@ -5196,8 +5508,8 @@ ws.onmessage = (event) => {
         );
         globalVoiceRoot.addSubMenuItem(
           menu.item("Set by Name...", () => {
-            var _a4, _b, _c, _d, _e;
-            const input = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Voice name or identifier", ttsSettings.voice || "");
+            var _a5, _b, _c, _d, _e;
+            const input = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Voice name or identifier", ttsSettings.voice || "");
             if (input == null) return;
             if (!voiceList.length) {
               (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "ttsVoice", String(input || "").trim());
@@ -5223,8 +5535,8 @@ ws.onmessage = (event) => {
         );
         globalVoiceRoot.addSubMenuItem(
           menu.item("Clear Global Voice", () => {
-            var _a4, _b;
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsVoice", "");
+            var _a5, _b;
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsVoice", "");
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             buildMenu();
           })
@@ -5245,12 +5557,12 @@ ws.onmessage = (event) => {
       if (ttsSettings.engine === "native") {
         speechRoot.addSubMenuItem(
           menu.item("Use Personal Voice for Current Language", () => {
-            var _a4, _b;
+            var _a5, _b;
             if (!voiceKey) {
               core.osd("POLYSCRIPT: No language key available", 1500);
               return;
             }
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsNativeEngine", "nss");
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsNativeEngine", "nss");
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             const nextMap = getTtsVoiceMap();
             nextMap[voiceKey] = PERSONAL_VOICE_TOKEN;
@@ -5261,8 +5573,8 @@ ws.onmessage = (event) => {
         );
         speechRoot.addSubMenuItem(
           menu.item(`Prefer Personal Voice (${ttsSettings.preferPersonal ? "On" : "Off"})`, () => {
-            var _a4, _b;
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsPreferPersonal", !ttsSettings.preferPersonal);
+            var _a5, _b;
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsPreferPersonal", !ttsSettings.preferPersonal);
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             buildMenu();
           }, { selected: ttsSettings.preferPersonal })
@@ -5275,34 +5587,22 @@ ws.onmessage = (event) => {
       );
       speechRoot.addSubMenuItem(
         menu.item(`Debug TTS (${ttsDebugEnabledCache ? "On" : "Off"})`, () => {
-          var _a4, _b;
+          var _a5, _b;
           const next = !ttsDebugEnabledCache;
           ttsDebugEnabledCache = next;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "ttsDebug", next);
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "ttsDebug", next);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           buildMenu();
         }, { selected: !!ttsDebugEnabledCache })
       );
       menu.addItem(speechRoot);
       menu.addItem(menu.separator());
-      const layoutRoot = menu.item("Subtitle Layout");
-      const autoArrange = autoArrangeSubsSetting;
-      layoutRoot.addSubMenuItem(
-        menu.item(`Auto Arrange (${autoArrange ? "On" : "Off"})`, () => {
-          var _a4, _b;
-          const next = !autoArrange;
-          autoArrangeSubsSetting = next;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "autoArrangeSubs", next);
-          (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
-          applySubtitleLayout();
-          buildMenu();
-        }, { selected: autoArrange })
-      );
+      const layoutRoot = menu.item("Subtitle Rendering");
       layoutRoot.addSubMenuItem(
         menu.item(`Hide Native Rendering (${hideNativeSubtitleRendering ? "On" : "Off"})`, () => {
-          var _a4, _b;
+          var _a5, _b;
           hideNativeSubtitleRendering = !hideNativeSubtitleRendering;
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "hideNativeSubtitleRendering", hideNativeSubtitleRendering);
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "hideNativeSubtitleRendering", hideNativeSubtitleRendering);
           (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
           syncNativeSubtitleVisibility();
           buildMenu();
@@ -5314,9 +5614,9 @@ ws.onmessage = (event) => {
       ["top", "bottom"].forEach((pos) => {
         primaryRoot.addSubMenuItem(
           menu.item(pos, () => {
-            var _a4, _b;
+            var _a5, _b;
             primarySubPositionSetting = pos === "top" ? "top" : "bottom";
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "primarySubPosition", pos);
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "primarySubPosition", pos);
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             applySubtitleLayout();
             buildMenu();
@@ -5328,9 +5628,9 @@ ws.onmessage = (event) => {
       ["top", "bottom"].forEach((pos) => {
         secondaryRoot.addSubMenuItem(
           menu.item(pos, () => {
-            var _a4, _b;
+            var _a5, _b;
             secondarySubPositionSetting = pos === "top" ? "top" : "bottom";
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "secondarySubPosition", pos);
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "secondarySubPosition", pos);
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             applySubtitleLayout();
             buildMenu();
@@ -5379,6 +5679,37 @@ ws.onmessage = (event) => {
         });
       }
       menu.addItem(langRoot);
+      const secondaryLangRoot = menu.item(`Secondary Subtitle (${secondaryTargetLang ? getLangLabel(normalizeSubtitleTargetLang(secondaryTargetLang)) || secondaryTargetLang : "Off"})`);
+      secondaryLangRoot.addSubMenuItem(
+        menu.item("Off", () => {
+          var _a5, _b;
+          secondaryTargetLang = "";
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "secondaryTargetLang", "");
+          (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
+          secondaryTranslationCache.clear();
+          secondaryTranslationPending.clear();
+          if (lastRenderedText) {
+            scheduleRender(lastRenderedText, { sourceText: "", cueToken: subLastDisplayedCueToken });
+          }
+          emitSidebarSettings({ skipAutoAiRefresh: true });
+          buildMenu();
+        }, { selected: !secondaryTargetLang })
+      );
+      entries.forEach(([code, name]) => {
+        secondaryLangRoot.addSubMenuItem(
+          menu.item(`${name} (${code})`, () => {
+            var _a5, _b;
+            secondaryTargetLang = code;
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "secondaryTargetLang", secondaryTargetLang);
+            (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
+            secondaryTranslationCache.clear();
+            secondaryTranslationPending.clear();
+            emitSidebarSettings({ skipAutoAiRefresh: true });
+            buildMenu();
+          }, { selected: normalizeSubtitleTargetLang(secondaryTargetLang) === code })
+        );
+      });
+      menu.addItem(secondaryLangRoot);
       const presetsRoot = menu.item("Presets");
       const presets = getPresets();
       PRESET_SLOTS.forEach((slot) => {
@@ -5388,16 +5719,16 @@ ws.onmessage = (event) => {
         slotRoot.addSubMenuItem(menu.item("Apply", () => applyPreset(slot)));
         slotRoot.addSubMenuItem(
           menu.item("Save Current", () => {
-            var _a4;
-            const name = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Preset name", (preset == null ? void 0 : preset.name) || `Preset ${slot}`);
+            var _a5;
+            const name = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Preset name", (preset == null ? void 0 : preset.name) || `Preset ${slot}`);
             savePreset(slot, name || `Preset ${slot}`);
             buildMenu();
           })
         );
         slotRoot.addSubMenuItem(
           menu.item("Rename", () => {
-            var _a4;
-            const name = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Preset name", (preset == null ? void 0 : preset.name) || `Preset ${slot}`);
+            var _a5;
+            const name = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Preset name", (preset == null ? void 0 : preset.name) || `Preset ${slot}`);
             if (!name) return;
             const next = getPresets();
             if (!next[slot]) next[slot] = { settings: getCurrentSettingsSnapshot() };
@@ -5415,9 +5746,10 @@ ws.onmessage = (event) => {
       });
       presetsRoot.addSubMenuItem(
         menu.item("Reset to Defaults", () => {
-          var _a4, _b, _c, _d, _e, _f, _g;
+          var _a5, _b, _c, _d, _e, _f, _g, _h;
           const defaults = {
             targetLang: "en",
+            secondaryTargetLang: "",
             translationProvider: "google",
             llmMode: "translate",
             llmMetaPrompt: "",
@@ -5429,7 +5761,7 @@ ws.onmessage = (event) => {
             sentenceMode: false,
             hideNativeSubtitleRendering: true,
             showSourceSubtitles: false,
-            showOriginalTranscript: false,
+            showOriginalTranscript: true,
             appearance: {
               fontSize: "large",
               bgColor: BG_COLORS.Black,
@@ -5441,17 +5773,19 @@ ws.onmessage = (event) => {
               overlayDock: "bottom"
             }
           };
-          (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "autoArrangeSubs", true);
+          (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "autoArrangeSubs", true);
           (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "hideNativeSubtitleRendering", true);
           (_c = preferences == null ? void 0 : preferences.set) == null ? void 0 : _c.call(preferences, "showSourceSubtitles", false);
-          (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "showOriginalTranscript", false);
-          (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "primarySubPosition", "bottom");
-          (_f = preferences == null ? void 0 : preferences.set) == null ? void 0 : _f.call(preferences, "secondarySubPosition", "bottom");
-          (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "segmentationEnabled", true);
+          (_d = preferences == null ? void 0 : preferences.set) == null ? void 0 : _d.call(preferences, "secondaryTargetLang", "");
+          (_e = preferences == null ? void 0 : preferences.set) == null ? void 0 : _e.call(preferences, "showOriginalTranscript", true);
+          (_f = preferences == null ? void 0 : preferences.set) == null ? void 0 : _f.call(preferences, "primarySubPosition", "bottom");
+          (_g = preferences == null ? void 0 : preferences.set) == null ? void 0 : _g.call(preferences, "secondarySubPosition", "bottom");
+          (_h = preferences == null ? void 0 : preferences.set) == null ? void 0 : _h.call(preferences, "segmentationEnabled", true);
           autoArrangeSubsSetting = true;
           hideNativeSubtitleRendering = true;
           showSourceSubtitles = false;
-          showOriginalTranscript = false;
+          secondaryTargetLang = "";
+          showOriginalTranscript = true;
           primarySubPositionSetting = "bottom";
           secondarySubPositionSetting = "bottom";
           segmentationEnabledSetting = true;
@@ -5462,20 +5796,6 @@ ws.onmessage = (event) => {
       menu.addItem(menu.separator());
       const appearance = getAppearanceSettings();
       const appearanceRoot = menu.item("Appearance");
-      const dockRoot = menu.item(`Overlay Dock (${appearance.overlayDock === "top" ? "Top" : "Bottom"})`);
-      dockRoot.addSubMenuItem(
-        menu.item("Bottom", () => {
-          setAppearanceSetting("overlayDock", "bottom");
-          buildMenu();
-        }, { selected: appearance.overlayDock === "bottom" })
-      );
-      dockRoot.addSubMenuItem(
-        menu.item("Top", () => {
-          setAppearanceSetting("overlayDock", "top");
-          buildMenu();
-        }, { selected: appearance.overlayDock === "top" })
-      );
-      appearanceRoot.addSubMenuItem(dockRoot);
       const sizeRoot = menu.item(`Font Size (${appearance.fontSize})`);
       Object.keys(FONT_SIZE_PRESETS).forEach((sizeKey) => {
         sizeRoot.addSubMenuItem(
@@ -5524,10 +5844,10 @@ ws.onmessage = (event) => {
         menu.item(
           `Segmentation (${isSegmentationEnabled() ? "On" : "Off"})`,
           () => {
-            var _a4, _b;
+            var _a5, _b;
             const next = !isSegmentationEnabled();
             segmentationEnabledSetting = next;
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "segmentationEnabled", next);
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "segmentationEnabled", next);
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             if (lastRenderedText) scheduleRender(lastRenderedText);
           },
@@ -5545,9 +5865,9 @@ ws.onmessage = (event) => {
       });
       placementRoot.addSubMenuItem(
         menu.item("Set Custom Offset (px)...", () => {
-          var _a4;
+          var _a5;
           const current = String(appearance.customOffset);
-          const next = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Overlay bottom offset (px)", current);
+          const next = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Overlay bottom offset (px)", current);
           const num = Number(next);
           if (!Number.isNaN(num)) {
             setAppearanceSetting("overlayCustomOffset", Math.max(0, Math.min(400, num)));
@@ -5561,11 +5881,11 @@ ws.onmessage = (event) => {
       const providerRoot = menu.item(`Translation Provider (${translationProvider})`);
       providerRoot.addSubMenuItem(
         menu.item("Google Translate", () => {
-          var _a4;
+          var _a5;
           translationProvider = "google";
           if (preferences == null ? void 0 : preferences.set) {
             preferences.set("translationProvider", "google");
-            (_a4 = preferences.sync) == null ? void 0 : _a4.call(preferences);
+            (_a5 = preferences.sync) == null ? void 0 : _a5.call(preferences);
           }
           clearTranslationCaches();
           usingFullFileTranslation = false;
@@ -5577,11 +5897,11 @@ ws.onmessage = (event) => {
       );
       providerRoot.addSubMenuItem(
         menu.item("Polyscript LLM", () => {
-          var _a4;
+          var _a5;
           translationProvider = "polyscript";
           if (preferences == null ? void 0 : preferences.set) {
             preferences.set("translationProvider", "polyscript");
-            (_a4 = preferences.sync) == null ? void 0 : _a4.call(preferences);
+            (_a5 = preferences.sync) == null ? void 0 : _a5.call(preferences);
           }
           clearTranslationCaches();
           usingFullFileTranslation = false;
@@ -5648,12 +5968,12 @@ ws.onmessage = (event) => {
       );
       providerRoot.addSubMenuItem(
         menu.item("Set Polyscript Base URL...", () => {
-          var _a4, _b;
+          var _a5, _b;
           if (!(utils == null ? void 0 : utils.prompt)) return;
           const base = utils.prompt("Polyscript API base URL", polyscriptBaseUrl);
           if (base != null) {
             polyscriptBaseUrl = normalizeServiceBaseUrl(base, DEFAULT_POLYSCRIPT_BASE_URL);
-            (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "polyscriptBaseUrl", polyscriptBaseUrl);
+            (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "polyscriptBaseUrl", polyscriptBaseUrl);
             (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
             core.osd("POLYSCRIPT: Base URL saved", 1500);
           }
@@ -5670,9 +5990,9 @@ ws.onmessage = (event) => {
         Object.entries(LLM_MODES).forEach(([modeKey, label]) => {
           llmRoot.addSubMenuItem(
             menu.item(label, () => {
-              var _a4, _b;
+              var _a5, _b;
               llmMode = modeKey;
-              (_a4 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a4.call(preferences, "llmMode", llmMode);
+              (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "llmMode", llmMode);
               (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
               clearTranslationCaches();
               usingFullFileTranslation = false;
@@ -5685,8 +6005,8 @@ ws.onmessage = (event) => {
         });
         llmRoot.addSubMenuItem(
           menu.item("Set Meta Prompt...", () => {
-            var _a4, _b, _c;
-            const prompt = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Additional LLM instructions (optional)", llmMetaPrompt);
+            var _a5, _b, _c;
+            const prompt = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Additional LLM instructions (optional)", llmMetaPrompt);
             if (prompt != null) {
               llmMetaPrompt = prompt;
               (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "llmMetaPrompt", llmMetaPrompt);
@@ -5696,8 +6016,8 @@ ws.onmessage = (event) => {
         );
         llmRoot.addSubMenuItem(
           menu.item("Set Custom Prompt...", () => {
-            var _a4, _b, _c;
-            const prompt = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "Custom LLM prompt", llmCustomPrompt);
+            var _a5, _b, _c;
+            const prompt = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Custom LLM prompt", llmCustomPrompt);
             if (prompt != null) {
               llmCustomPrompt = prompt;
               (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "llmCustomPrompt", llmCustomPrompt);
@@ -5729,8 +6049,8 @@ ws.onmessage = (event) => {
         llmRoot.addSubMenuItem(llmPresetRoot2);
         llmRoot.addSubMenuItem(
           menu.item("Set LLM Model...", () => {
-            var _a4, _b, _c;
-            const model = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "LLM model", llmModel);
+            var _a5, _b, _c;
+            const model = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "LLM model", llmModel);
             if (model != null) {
               llmModel = model.trim();
               (_b = preferences == null ? void 0 : preferences.set) == null ? void 0 : _b.call(preferences, "llmModel", llmModel);
@@ -5740,8 +6060,8 @@ ws.onmessage = (event) => {
         );
         llmRoot.addSubMenuItem(
           menu.item("Set LLM Temperature...", () => {
-            var _a4, _b, _c;
-            const temp = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "LLM temperature (0-1)", String(llmTemperature));
+            var _a5, _b, _c;
+            const temp = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "LLM temperature (0-1)", String(llmTemperature));
             const num = Number(temp);
             if (!Number.isNaN(num)) {
               llmTemperature = Math.max(0, Math.min(1, num));
@@ -5752,8 +6072,8 @@ ws.onmessage = (event) => {
         );
         llmRoot.addSubMenuItem(
           menu.item("Set LLM Max Tokens...", () => {
-            var _a4, _b, _c;
-            const mt = (_a4 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a4.call(utils, "LLM max tokens", String(llmMaxTokens));
+            var _a5, _b, _c;
+            const mt = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "LLM max tokens", String(llmMaxTokens));
             const num = Number(mt);
             if (!Number.isNaN(num)) {
               llmMaxTokens = Math.max(256, num);
@@ -5772,12 +6092,15 @@ ws.onmessage = (event) => {
   function escapeHtml(text) {
     return String(text != null ? text : "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
   }
-  var LOOKAHEAD_COUNT = 5;
-  var PREFETCH_INITIAL_COUNT = 10;
+  var LOOKAHEAD_COUNT = 8;
+  var PREFETCH_INITIAL_COUNT = 24;
+  var EXACT_TIMELINE_WINDOW_LOOKAHEAD = 40;
+  var EXACT_TIMELINE_WINDOW_REFRESH_DISTANCE = 12;
   var lastLookaheadIndex = -1;
   function prefetchUpcomingTranslations(currentText) {
     if (!subtitleEntries || !subtitleEntries.length) return;
     if (usingFullFileTranslation) return;
+    if (hasExactSubtitleTimeline()) return;
     const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
     let idx = -1;
     if (typeof timePos === "number") {
@@ -5802,18 +6125,60 @@ ws.onmessage = (event) => {
       if (nextText && !lineTranslationCache.has(nextText)) {
         translateLine(nextText);
       }
+      if (nextText && getSecondaryTargetLang()) {
+        ensureSecondarySubtitleTranslation(nextText);
+      }
     }
   }
   function prefetchFirstLines() {
     if (!subtitleEntries || !subtitleEntries.length) return;
-    if (usingFullFileTranslation) return;
+    if (usingFullFileTranslation) {
+      if (hasExactSubtitleTimeline()) {
+        void prefetchSecondarySubtitleWindow(0, EXACT_TIMELINE_WINDOW_LOOKAHEAD).catch(() => {
+        });
+      }
+      return;
+    }
+    if (hasExactSubtitleTimeline()) {
+      void ensureExactTimelineTranslationWindow(0).catch(() => {
+      });
+      void prefetchSecondarySubtitleWindow(0, EXACT_TIMELINE_WINDOW_LOOKAHEAD).catch(() => {
+      });
+      maybeStartExactTimelineFullFileTranslation("prefetch");
+      return;
+    }
     const count = Math.min(PREFETCH_INITIAL_COUNT, subtitleEntries.length);
     for (let i = 0; i < count; i++) {
       const text = subtitleEntries[i].content;
       if (text && !lineTranslationCache.has(text)) {
         translateLine(text);
       }
+      if (text && getSecondaryTargetLang()) {
+        ensureSecondarySubtitleTranslation(text);
+      }
     }
+  }
+  function prefetchExactTimelineTranslations(activeEntry, reason = "playback") {
+    if (!hasExactSubtitleTimeline()) return;
+    if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return;
+    const anchorIndex = Number(activeEntry == null ? void 0 : activeEntry.index);
+    if (!Number.isFinite(anchorIndex) || anchorIndex < 0 || anchorIndex >= subtitleEntries.length) return;
+    const entry = activeEntry == null ? void 0 : activeEntry.entry;
+    const sourceText = String((entry == null ? void 0 : entry.sourceContent) || (entry == null ? void 0 : entry.content) || "").trim();
+    if (getSecondaryTargetLang()) {
+      void prefetchSecondarySubtitleWindow(anchorIndex, EXACT_TIMELINE_WINDOW_LOOKAHEAD).catch(() => {
+      });
+    }
+    if (usingFullFileTranslation || usingNativeTargetSubs) return;
+    const currentNeedsTranslation = !!sourceText && !String((entry == null ? void 0 : entry.translatedContent) || "").trim() && !String(lineTranslationCache.get(sourceText) || "").trim();
+    const currentNeedsSecondary = !!sourceText && getSecondarySubtitleState(sourceText, String((entry == null ? void 0 : entry.translatedContent) || lineTranslationCache.get(sourceText) || "")).required && !getSecondarySubtitleState(sourceText, String((entry == null ? void 0 : entry.translatedContent) || lineTranslationCache.get(sourceText) || "")).ready;
+    const shouldRefreshWindow = currentNeedsTranslation || currentNeedsSecondary || exactTimelineWindowAnchorIndex < 0 || anchorIndex < exactTimelineWindowAnchorIndex || anchorIndex >= exactTimelineWindowAnchorIndex + EXACT_TIMELINE_WINDOW_REFRESH_DISTANCE;
+    if (!shouldRefreshWindow) return;
+    if (exactTimelineWindowActive && exactTimelineWindowAnchorIndex === anchorIndex) return;
+    console.log(`POLYSCRIPT: Prefetching exact subtitle window (${reason}) at ${anchorIndex}.`);
+    void ensureExactTimelineTranslationWindow(anchorIndex).catch((error) => {
+      console.log(`POLYSCRIPT-ERROR: Exact subtitle window prefetch failed: ${String((error == null ? void 0 : error.message) || error)}`);
+    });
   }
   async function translateLine(text) {
     if (!text) return "";
@@ -5868,14 +6233,206 @@ ws.onmessage = (event) => {
         lineTranslationCache.delete(text);
       }
     } finally {
-      if (generation === lineTranslationGeneration && lastOriginalText === text) {
+      if (generation === lineTranslationGeneration && lastOriginalText === text && lastOriginalCueToken && lastOriginalCueToken === subLastDisplayedCueToken) {
         const translatedLine = lineTranslationCache.get(text);
         if (translatedLine) {
-          scheduleRender(translatedLine);
+          const secondaryState = getSecondarySubtitleState(text, translatedLine);
+          ensureSecondarySubtitleTranslation(text, lastOriginalCueToken);
+          if (isSecondarySubtitleSatisfied(secondaryState)) {
+            scheduleRender(translatedLine, {
+              sourceText: secondaryState.text || (!secondaryState.required ? lastOriginalSourceText : ""),
+              cueToken: lastOriginalCueToken
+            });
+          }
         }
       }
-      if (generation === lineTranslationGeneration && liveTranscriptEntries.length) {
-        emitLiveTranscriptEntries();
+      if (generation === lineTranslationGeneration) {
+        if (hasExactSubtitleTimeline()) {
+          emitTranscriptEntries();
+        } else if (liveTranscriptEntries.length) {
+          emitLiveTranscriptEntries();
+        }
+      }
+    }
+  }
+  function getSecondaryTranslationCacheKey(text, target = getSecondaryTargetLang()) {
+    const source = String(text || "").trim();
+    const lang = normalizeSubtitleTargetLang(target);
+    if (!source || !lang) return "";
+    return JSON.stringify([lang, source]);
+  }
+  function getCachedSecondarySubtitleText(sourceText, primaryText = "") {
+    const target = getSecondaryTargetLang();
+    if (!target) return "";
+    const source = String(sourceText || "").trim();
+    if (!source) return "";
+    if (normalizeSubtitleComparisonText(target) === normalizeSubtitleComparisonText(getEffectiveTargetLang())) return "";
+    const cached = secondaryTranslationCache.get(getSecondaryTranslationCacheKey(source, target));
+    return getDistinctSecondarySubtitleText(cached, primaryText);
+  }
+  function getSecondarySubtitleState(sourceText, primaryText = "") {
+    const target = getSecondaryTargetLang();
+    const source = String(sourceText || "").trim();
+    if (!target || !source) {
+      return { required: false, ready: true, text: "" };
+    }
+    if (normalizeSubtitleComparisonText(target) === normalizeSubtitleComparisonText(getEffectiveTargetLang())) {
+      return { required: false, ready: true, text: "" };
+    }
+    const key = getSecondaryTranslationCacheKey(source, target);
+    if (!key) {
+      return { required: false, ready: true, text: "" };
+    }
+    if (secondaryTranslationCache.has(key)) {
+      return {
+        required: true,
+        ready: true,
+        text: getDistinctSecondarySubtitleText(secondaryTranslationCache.get(key), primaryText)
+      };
+    }
+    ensureSecondarySubtitleTranslation(source);
+    return { required: true, ready: false, text: "" };
+  }
+  function isSecondarySubtitleSatisfied(state) {
+    if (!(state == null ? void 0 : state.required)) return true;
+    return !!state.ready && !!String(state.text || "").trim();
+  }
+  function ensureSecondarySubtitleTranslation(sourceText, cueToken = subLastDisplayedCueToken) {
+    const target = getSecondaryTargetLang();
+    const source = String(sourceText || "").trim();
+    const key = getSecondaryTranslationCacheKey(source, target);
+    if (!key || secondaryTranslationCache.has(key) || secondaryTranslationPending.has(key)) return;
+    secondaryTranslationPending.add(key);
+    translateText(source, target).then((translated) => {
+      const text = String(translated || "").trim();
+      secondaryTranslationCache.set(key, text || source);
+    }).catch(() => {
+      secondaryTranslationCache.set(key, source);
+    }).finally(() => {
+      secondaryTranslationPending.delete(key);
+    });
+  }
+  async function prefetchSecondarySubtitleWindow(anchorIndex, count = EXACT_TIMELINE_WINDOW_LOOKAHEAD) {
+    var _a5, _b;
+    const target = getSecondaryTargetLang();
+    if (!target || !Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
+    if (normalizeSubtitleComparisonText(target) === normalizeSubtitleComparisonText(getEffectiveTargetLang())) return false;
+    if (!Number.isFinite(Number(anchorIndex)) || anchorIndex < 0 || anchorIndex >= subtitleEntries.length) return false;
+    const start = Math.max(0, Number(anchorIndex) - 2);
+    const end = Math.min(subtitleEntries.length, Number(anchorIndex) + count);
+    const batch = [];
+    for (let i = start; i < end; i += 1) {
+      const source = String(((_a5 = subtitleEntries[i]) == null ? void 0 : _a5.sourceContent) || ((_b = subtitleEntries[i]) == null ? void 0 : _b.content) || "").trim();
+      const key = getSecondaryTranslationCacheKey(source, target);
+      if (!key || secondaryTranslationCache.has(key) || secondaryTranslationPending.has(key)) continue;
+      secondaryTranslationPending.add(key);
+      batch.push({ key, source });
+    }
+    if (!batch.length) return true;
+    try {
+      const texts = batch.map((item) => item.source.replace(/\n/g, " <|ps_line|> "));
+      const translated = await translateBatch(texts, target);
+      batch.forEach((item, index) => {
+        const restored = String(translated[index] || "").replace(/\s*<\|ps_line\|>\s*/g, "\n").trim();
+        secondaryTranslationCache.set(item.key, restored || item.source);
+      });
+      return true;
+    } catch (error) {
+      batch.forEach((item) => {
+        secondaryTranslationCache.set(item.key, item.source);
+      });
+      console.log(`POLYSCRIPT-WARN: Secondary subtitle prefetch failed: ${String((error == null ? void 0 : error.message) || error)}`);
+      return false;
+    } finally {
+      batch.forEach((item) => {
+        secondaryTranslationPending.delete(item.key);
+      });
+    }
+  }
+  function getExactTimelineFullFileTranslationRequestKey() {
+    if (!polyscriptEnabled || usingFullFileTranslation || usingNativeTargetSubs) return "";
+    if (!subtitleEntriesSourceKey) return "";
+    if (!hasExactSubtitleTimeline()) return "";
+    return JSON.stringify([
+      subtitleEntriesSourceKey,
+      getEffectiveTargetLang(),
+      translationProvider,
+      llmMode,
+      llmCustomTarget,
+      llmMetaPrompt,
+      llmModel,
+      "full-file"
+    ]);
+  }
+  function maybeStartExactTimelineFullFileTranslation(reason = "exact-timeline") {
+    const requestKey = getExactTimelineFullFileTranslationRequestKey();
+    if (!requestKey) return false;
+    if (translatingFile) return false;
+    if (exactTimelineFullFileTranslationRequestKey === requestKey) return false;
+    exactTimelineFullFileTranslationRequestKey = requestKey;
+    console.log(`POLYSCRIPT: Starting full-file translation for exact timeline (${reason}).`);
+    void translateCurrentSubtitleFile();
+    return true;
+  }
+  async function ensureExactTimelineTranslationWindow(anchorIndex) {
+    if (!hasExactSubtitleTimeline() || usingFullFileTranslation || usingNativeTargetSubs) return false;
+    if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
+    if (!Number.isFinite(Number(anchorIndex)) || anchorIndex < 0 || anchorIndex >= subtitleEntries.length) return false;
+    const windowStart = Math.max(0, Number(anchorIndex) - 2);
+    const windowEnd = Math.min(subtitleEntries.length, Number(anchorIndex) + EXACT_TIMELINE_WINDOW_LOOKAHEAD);
+    const entriesToTranslate = subtitleEntries.slice(windowStart, windowEnd).filter((entry) => {
+      const source = String((entry == null ? void 0 : entry.content) || "").trim();
+      return source && !String((entry == null ? void 0 : entry.translatedContent) || "").trim();
+    });
+    if (!entriesToTranslate.length) {
+      exactTimelineWindowAnchorIndex = Number(anchorIndex);
+      return true;
+    }
+    if (exactTimelineWindowAnchorIndex === Number(anchorIndex) && exactTimelineWindowActive) {
+      return false;
+    }
+    const effectiveTarget = getEffectiveTargetLang();
+    const batchSize = shouldUseLlmTranslation(effectiveTarget) ? 8 : 18;
+    const generation = ++exactTimelineWindowGeneration;
+    exactTimelineWindowAnchorIndex = Number(anchorIndex);
+    exactTimelineWindowActive = true;
+    try {
+      for (let i = 0; i < entriesToTranslate.length; i += batchSize) {
+        if (generation !== exactTimelineWindowGeneration) return false;
+        const batch = entriesToTranslate.slice(i, i + batchSize);
+        const batchTexts = batch.map((entry) => String(entry.content || "").replace(/\n/g, " <|ps_line|> "));
+        const translations = await translateBatch(batchTexts, effectiveTarget);
+        if (generation !== exactTimelineWindowGeneration) return false;
+        batch.forEach((entry, index) => {
+          const restored = String(translations[index] || "").replace(/\s*<\|ps_line\|>\s*/g, "\n").trim();
+          entry.translatedContent = restored;
+          if (entry.content && entry.translatedContent) {
+            lineTranslationCache.set(entry.content, entry.translatedContent);
+          }
+        });
+        emitTranscriptEntries();
+        const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
+        const timeMs = typeof timePos === "number" ? timePos * 1e3 : null;
+        const activeEntry = timeMs != null ? findEntryAtTime(subtitleEntries, timeMs, lastActiveSubtitleIndex) : { entry: null, index: -1 };
+        if ((activeEntry == null ? void 0 : activeEntry.entry) && batch.includes(activeEntry.entry)) {
+          const scene = composeSubtitleScene({
+            activeEntry,
+            timeMs,
+            rawCurrentText: mpv.getString("sub-text") || "",
+            exactTimelineMode: true
+          });
+          if (scene.hasRenderableCue) {
+            scheduleRender(scene.currentText, { sourceText: scene.sourceText, cueToken: scene.cueToken });
+          }
+        }
+      }
+      return true;
+    } catch (error) {
+      console.log(`POLYSCRIPT-ERROR: Exact timeline window translation failed: ${String((error == null ? void 0 : error.message) || error)}`);
+      return false;
+    } finally {
+      if (generation === exactTimelineWindowGeneration) {
+        exactTimelineWindowActive = false;
       }
     }
   }
@@ -5909,6 +6466,261 @@ ws.onmessage = (event) => {
       }))
     }));
   }
+  function inferMorphologyLanguage(text) {
+    const sourceText = String(text || "");
+    if (/[\u1F00-\u1FFF]/u.test(sourceText)) return "grc";
+    const selectedTrack = getSelectedSubTrack();
+    const trackLang = normalizeLangForSubtitleMatch((selectedTrack == null ? void 0 : selectedTrack.lang) || (selectedTrack == null ? void 0 : selectedTrack.language) || "");
+    if (trackLang === "la") return "lat";
+    return "";
+  }
+  function mergeDictionaryEntries(primaryEntries, extraEntries) {
+    const merged = Array.isArray(primaryEntries) ? [...primaryEntries] : [];
+    const seen = new Set(merged.map((entry) => JSON.stringify(entry)));
+    (Array.isArray(extraEntries) ? extraEntries : []).forEach((entry) => {
+      const key = JSON.stringify(entry);
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(entry);
+      }
+    });
+    return merged;
+  }
+  function morphologyDefinitionsToDictionaryEntries(morphology) {
+    var _a5;
+    if (!morphology || !Array.isArray(morphology.definitions) || morphology.definitions.length === 0) {
+      return [];
+    }
+    const preferredPos = String(((_a5 = morphology.preferredAnalysis) == null ? void 0 : _a5.partOfSpeech) || "").trim();
+    return [
+      {
+        pos: preferredPos ? `${preferredPos} \xB7 LSJ` : "LSJ",
+        definitions: morphology.definitions.map((definition) => ({
+          def: (definition == null ? void 0 : definition.gloss) || "",
+          example: null
+        })).filter((definition) => definition.def)
+      }
+    ].filter((entry) => entry.definitions.length > 0);
+  }
+  async function fetchMorphologyAssist(text) {
+    const language = inferMorphologyLanguage(text);
+    if (!language) return null;
+    try {
+      const resp = await safeHttpPost(`${polyscriptBaseUrl}/api/morphology/analyze-word`, {
+        headers: {
+          "Content-Type": "application/json"
+        },
+        data: {
+          language,
+          surface: String(text || ""),
+          includeDefinitions: true,
+          includeParadigms: true
+        },
+        timeout: 3
+      });
+      const data = resp == null ? void 0 : resp.data;
+      if (data && typeof data === "object") {
+        if (!data.language) data.language = language;
+        return data;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function normalizeLookupInfo(data) {
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      return {
+        translation: typeof data.translation === "string" ? data.translation : "",
+        translit: typeof data.transliteration === "string" ? data.transliteration : typeof data.translit === "string" ? data.translit : "",
+        dictionary: Array.isArray(data.dictionary) ? data.dictionary : [],
+        morphology: data.morphology && typeof data.morphology === "object" ? data.morphology : null
+      };
+    }
+    let translation = "";
+    if (data && data[0]) {
+      data[0].forEach((seg) => {
+        if (seg[0]) translation += seg[0];
+      });
+    }
+    let translit = "";
+    if (data && data[0] && data[0][data[0].length - 1] && data[0][data[0].length - 1][3]) {
+      translit = data[0][data[0].length - 1][3] || "";
+    }
+    return {
+      translation,
+      translit,
+      dictionary: parseDictionary(data),
+      morphology: null
+    };
+  }
+  function formatMorphologyFeatureLabel(key) {
+    const labels = {
+      partOfSpeech: "Part of speech",
+      citationForm: "Citation form"
+    };
+    if (labels[key]) return labels[key];
+    return String(key || "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+  }
+  function summarizeMorphologyAnalysis(analysis) {
+    if (!analysis || typeof analysis !== "object") return "";
+    const parts = [];
+    if (analysis.partOfSpeech) parts.push(analysis.partOfSpeech);
+    const featureOrder = ["case", "number", "gender", "person", "tense", "voice", "mood", "degree", "declension", "dialect"];
+    const features = analysis.features && typeof analysis.features === "object" ? analysis.features : {};
+    const seen = /* @__PURE__ */ new Set();
+    featureOrder.forEach((key) => {
+      const value = features[key];
+      if (value) {
+        parts.push(value);
+        seen.add(key);
+      }
+    });
+    Object.entries(features).filter(([key, value]) => value && !seen.has(key)).sort(([left], [right]) => left.localeCompare(right)).forEach(([, value]) => {
+      parts.push(value);
+    });
+    return parts.join(" \u2022 ");
+  }
+  function buildParadigmPreview(morphology) {
+    const firstParadigm = Array.isArray(morphology == null ? void 0 : morphology.paradigms) ? morphology.paradigms.find((item) => item && Array.isArray(item.rows) && item.rows.length > 0) : null;
+    if (!firstParadigm) return null;
+    const headers = Array.isArray(firstParadigm.headers) ? firstParadigm.headers.filter(Boolean).slice(0, 4) : [];
+    const rows = Array.isArray(firstParadigm.rows) ? firstParadigm.rows.filter((row) => Array.isArray(row) && row.length > 1).filter((row) => String(row[0] || "").trim().toLowerCase() !== "notes:").slice(0, 4).map((row) => row.slice(0, Math.max(headers.length || 0, 4)).map((cell) => String(cell || "").trim())) : [];
+    if (rows.length === 0) return null;
+    return {
+      title: firstParadigm.title || "Paradigm",
+      headers,
+      rows
+    };
+  }
+  function buildParadigmPreviewHtml(morphology) {
+    const preview = buildParadigmPreview(morphology);
+    if (!preview) return "";
+    const headerHtml = preview.headers.length ? `<thead><tr>${preview.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>` : "";
+    const rowsHtml = preview.rows.map((row) => `<tr>${row.map((cell, index) => index === 0 ? `<th>${escapeHtml(cell)}</th>` : `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("");
+    return `
+    <div class="ps-dict-paradigm">
+      <div class="ps-dict-paradigm-title">${escapeHtml(preview.title)}</div>
+      <table class="ps-dict-paradigm-table">
+        ${headerHtml}
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+  }
+  function buildMorphologyTooltipHtml(morphology) {
+    var _a5;
+    if (!morphology || typeof morphology !== "object") return "";
+    const preferred = morphology.preferredAnalysis || ((_a5 = morphology.analyses) == null ? void 0 : _a5[0]) || null;
+    const featureSource = (preferred == null ? void 0 : preferred.features) && typeof preferred.features === "object" ? preferred.features : {};
+    const featureEntries = Object.entries(featureSource).filter(([, value]) => value != null && value !== "");
+    const summary = summarizeMorphologyAnalysis(preferred);
+    const lemma = morphology.citationForm || morphology.lemma || (preferred == null ? void 0 : preferred.lemma) || "";
+    const parts = [];
+    if (lemma) {
+      parts.push(`<div class="ps-dict-lemma">${escapeHtml(lemma)}</div>`);
+    }
+    if (summary) {
+      parts.push(`<div class="ps-dict-morph-summary">${escapeHtml(summary)}</div>`);
+    }
+    if (featureEntries.length > 0) {
+      const chips = featureEntries.map(([key, value]) => `<span class="ps-dict-chip">${escapeHtml(`${formatMorphologyFeatureLabel(key)}: ${value}`)}</span>`).join("");
+      parts.push(`<div class="ps-dict-chips">${chips}</div>`);
+    }
+    const alternateAnalyses = Array.isArray(morphology.analyses) ? morphology.analyses.filter((analysis) => analysis && analysis !== preferred).map((analysis) => summarizeMorphologyAnalysis(analysis)).filter(Boolean).slice(0, 2) : [];
+    if (alternateAnalyses.length > 0) {
+      parts.push(`<div class="ps-dict-note">Also possible: ${escapeHtml(alternateAnalyses.join(" / "))}</div>`);
+    } else if (Array.isArray(morphology.paradigms) && morphology.paradigms.length > 0) {
+      parts.push(`<div class="ps-dict-note">Paradigm preview</div>`);
+    }
+    const paradigmHtml = buildParadigmPreviewHtml(morphology);
+    if (paradigmHtml) {
+      parts.push(paradigmHtml);
+    }
+    if (!parts.length) return "";
+    return `<div class="ps-dict-morphology">${parts.join("")}</div>`;
+  }
+  function truncateLookupCopy(text, maxLength = 180) {
+    const normalized = String(text || "").replace(/\s+/g, " ").trim();
+    if (!normalized || normalized.length <= maxLength) return normalized;
+    const sliced = normalized.slice(0, maxLength);
+    const boundary = sliced.lastIndexOf(" ");
+    return `${(boundary > 80 ? sliced.slice(0, boundary) : sliced).trim()}\u2026`;
+  }
+  function hasExpandedLookupDetails(info) {
+    const morphology = info == null ? void 0 : info.morphology;
+    const analysesCount = Array.isArray(morphology == null ? void 0 : morphology.analyses) ? morphology.analyses.length : 0;
+    const hasParadigms = Array.isArray(morphology == null ? void 0 : morphology.paradigms) && morphology.paradigms.length > 0;
+    const hasRichCitation = Boolean(String((morphology == null ? void 0 : morphology.citationForm) || "").trim());
+    const dictionaryEntries = Array.isArray(info == null ? void 0 : info.dictionary) ? info.dictionary : [];
+    const hasDenseDictionary = dictionaryEntries.some((entry) => {
+      const definitions = Array.isArray(entry == null ? void 0 : entry.definitions) ? entry.definitions : [];
+      return definitions.length > 1 || definitions.some((definition) => String((definition == null ? void 0 : definition.def) || "").trim().length > 180);
+    });
+    return analysesCount > 1 || hasParadigms || hasRichCitation || hasDenseDictionary;
+  }
+  function inferLookupLanguage(word, info = null) {
+    var _a5;
+    const morphologyLanguage = normalizeLangForSubtitleMatch(((_a5 = info == null ? void 0 : info.morphology) == null ? void 0 : _a5.language) || "");
+    if (morphologyLanguage === "grc" || morphologyLanguage === "lat") return morphologyLanguage;
+    const selectedTrack = getSelectedSubTrack();
+    const selectedTrackLang = normalizeLangForSubtitleMatch((selectedTrack == null ? void 0 : selectedTrack.lang) || (selectedTrack == null ? void 0 : selectedTrack.language) || "");
+    if (selectedTrackLang === "la") return "lat";
+    const sourceText = String(word || "");
+    if (/[\u1F00-\u1FFF]/u.test(sourceText)) return "grc";
+    return "";
+  }
+  function getLookupReferenceTerm(word, info = null) {
+    var _a5, _b;
+    const candidates = [
+      (_a5 = info == null ? void 0 : info.morphology) == null ? void 0 : _a5.lemma,
+      (_b = info == null ? void 0 : info.morphology) == null ? void 0 : _b.citationForm,
+      word
+    ];
+    for (const candidate of candidates) {
+      const text = String(candidate || "").trim();
+      if (!text) continue;
+      const headword = text.split(/[;,/]/)[0].trim();
+      if (headword) return headword;
+    }
+    return String(word || "").trim();
+  }
+  function buildLookupLinks(word, info = null) {
+    const cleanWord2 = String(word || "").trim();
+    const lookupLanguage = inferLookupLanguage(cleanWord2, info);
+    const referenceTerm = getLookupReferenceTerm(cleanWord2, info);
+    const encodedWord = encodeURIComponent(cleanWord2);
+    const encodedReferenceTerm = encodeURIComponent(referenceTerm);
+    const googleSourceLanguage = lookupLanguage === "lat" ? "la" : "auto";
+    const links = [
+      {
+        label: "Google Translate",
+        href: `https://translate.google.com/?sl=${googleSourceLanguage}&tl=en&text=${encodedWord}&op=translate`
+      }
+    ];
+    if (lookupLanguage === "grc" || lookupLanguage === "lat") {
+      links.push(
+        {
+          label: "Logeion",
+          href: `https://logeion.uchicago.edu/${encodedReferenceTerm}`
+        },
+        {
+          label: "Wiktionary",
+          href: `https://en.wiktionary.org/wiki/${encodedReferenceTerm}`
+        }
+      );
+    }
+    links.push({
+      label: "Search",
+      href: `https://www.google.com/search?q=define+${encodedReferenceTerm}`
+    });
+    return links;
+  }
+  function buildLookupLinksHtml(word, info = null) {
+    const links = buildLookupLinks(word, info);
+    if (!links.length) return "";
+    return `<div class="ps-dict-links">${links.map((link) => `<a class="ps-dict-link" href="${escapeHtml(link.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`).join("")}</div>`;
+  }
   async function fetchWordInfo(word) {
     const key = normalizeWord(word);
     if (!key || dictCache.has(key) || dictPending.has(key)) return;
@@ -5916,23 +6728,18 @@ ws.onmessage = (event) => {
     dictPending.add(key);
     try {
       const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(DICT_LANG)}&dt=t&dt=rm&dt=md&dt=ex&q=${encodeURIComponent(key)}`;
-      const res = await safeHttpGet(url);
-      const data = res.data;
-      let translation = "";
-      if (data && data[0]) {
-        data[0].forEach((seg) => {
-          if (seg[0]) translation += seg[0];
-        });
-      }
-      let translit = "";
-      if (data && data[0] && data[0][data[0].length - 1] && data[0][data[0].length - 1][3]) {
-        translit = data[0][data[0].length - 1][3] || "";
-      }
-      const dictionary = parseDictionary(data);
-      dictCache.set(key, { translation, translit, dictionary });
+      const [translationResp, morphology] = await Promise.all([
+        safeHttpGet(url),
+        fetchMorphologyAssist(key)
+      ]);
+      const info = normalizeLookupInfo(translationResp.data);
+      info.dictionary = mergeDictionaryEntries(info.dictionary, morphologyDefinitionsToDictionaryEntries(morphology));
+      info.morphology = morphology || info.morphology || null;
+      dictCache.set(key, info);
+      const { translit } = info;
       if (translit) translitCache.set(key, translit);
     } catch (e) {
-      dictCache.set(key, { translation: "", translit: "", dictionary: [] });
+      dictCache.set(key, { translation: "", translit: "", dictionary: [], morphology: null });
     } finally {
       dictPending.delete(key);
       scheduleDictionaryOverlayRefresh();
@@ -5964,6 +6771,7 @@ ws.onmessage = (event) => {
     }));
   }
   function buildTooltipHtml(wordKey, displayWord) {
+    var _a5;
     const info = dictCache.get(wordKey);
     if (!info) return "";
     const parts = [];
@@ -5977,21 +6785,61 @@ ws.onmessage = (event) => {
     if (info.translation) {
       parts.push(`<div class="ps-dict-translation">${escapeHtml(info.translation)}</div>`);
     }
+    const morphologyHtml = buildMorphologyTooltipHtml(info.morphology);
+    if (morphologyHtml) {
+      parts.push(morphologyHtml);
+    }
     if (info.dictionary && info.dictionary.length) {
       const section = [];
-      info.dictionary.slice(0, 2).forEach((pos) => {
+      info.dictionary.slice(0, 1).forEach((pos) => {
         section.push(`<div class="ps-dict-pos">${escapeHtml(pos.pos)}</div>`);
-        pos.definitions.slice(0, 2).forEach((def) => {
-          section.push(`<div class="ps-dict-def">- ${escapeHtml(def.def)}</div>`);
-          if (def.example) {
-            section.push(`<div class="ps-dict-example">e.g. "${escapeHtml(def.example)}"</div>`);
-          }
+        pos.definitions.slice(0, 1).forEach((def) => {
+          section.push(`<div class="ps-dict-def">- ${escapeHtml(truncateLookupCopy(def.def, 220))}</div>`);
         });
       });
       if (section.length) {
         parts.push(`<div class="ps-dict-section">${section.join("")}</div>`);
       }
     }
+    if (hasExpandedLookupDetails(info)) {
+      const expandedSection = [];
+      if (Array.isArray(info.dictionary) && info.dictionary.length) {
+        const dictionaryRows = [];
+        info.dictionary.forEach((pos) => {
+          dictionaryRows.push(`<div class="ps-dict-pos">${escapeHtml(pos.pos)}</div>`);
+          pos.definitions.forEach((def) => {
+            dictionaryRows.push(`<div class="ps-dict-def">- ${escapeHtml(def.def)}</div>`);
+            if (def.example) {
+              dictionaryRows.push(`<div class="ps-dict-example">e.g. "${escapeHtml(def.example)}"</div>`);
+            }
+          });
+        });
+        if (dictionaryRows.length) {
+          expandedSection.push(`<div class="ps-dict-section">${dictionaryRows.join("")}</div>`);
+        }
+      }
+      if (Array.isArray((_a5 = info == null ? void 0 : info.morphology) == null ? void 0 : _a5.paradigms) && info.morphology.paradigms.length > 0) {
+        const paradigmTables = info.morphology.paradigms.filter((item) => item && Array.isArray(item.rows) && item.rows.length > 0).slice(0, 6).map((paradigm) => {
+          const headers = Array.isArray(paradigm.headers) ? paradigm.headers.filter((header) => String(header || "").trim()) : [];
+          const headerHtml = headers.length ? `<thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>` : "";
+          const rowsHtml = paradigm.rows.filter((row) => Array.isArray(row) && row.length > 0).map((row) => `<tr>${row.map((cell, index) => index === 0 ? `<th>${escapeHtml(String(cell || "").trim())}</th>` : `<td>${escapeHtml(String(cell || "").trim())}</td>`).join("")}</tr>`).join("");
+          return `
+            <div class="ps-dict-paradigm">
+              <div class="ps-dict-paradigm-title">${escapeHtml(paradigm.title || "Paradigm")}</div>
+              <table class="ps-dict-paradigm-table">
+                ${headerHtml}
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </div>
+          `;
+        }).join("");
+        if (paradigmTables) expandedSection.push(paradigmTables);
+      }
+      if (expandedSection.length) {
+        parts.push(`<div class="ps-dict-details-body">${expandedSection.join("")}</div>`);
+      }
+    }
+    parts.push(buildLookupLinksHtml(displayWord || wordKey, info));
     return parts.join("");
   }
   var LLM_PROMPTS = {
@@ -6103,7 +6951,7 @@ Only output the transformed text, nothing else.`,
     })
   };
   async function callPolyscriptLLM(messages, options = {}) {
-    var _a4, _b, _c;
+    var _a5, _b, _c;
     const token = await getValidPolyscriptToken();
     if (!token) {
       const now = Date.now();
@@ -6152,7 +7000,7 @@ Only output the transformed text, nothing else.`,
       throw new Error(`Polyscript API error: ${resp.statusCode} ${resp.text || ""}`);
     }
     const data = parseJsonPayload(resp.data || resp.text) || {};
-    const content = data.content || data.text || data.result || data.translation || data.output_text || ((_c = (_b = (_a4 = data.choices) == null ? void 0 : _a4[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content) || "";
+    const content = data.content || data.text || data.result || data.translation || data.output_text || ((_c = (_b = (_a5 = data.choices) == null ? void 0 : _a5[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content) || "";
     void postTelemetryEvent("llm.request_completed", {
       feature: "llm",
       outcome: "success",
@@ -6205,6 +7053,19 @@ Only output the transformed text, nothing else.`,
     }
     return targetLang;
   }
+  function normalizeSubtitleTargetLang(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    return resolveLanguageInput(raw) || raw;
+  }
+  function getSecondaryTargetLang() {
+    return normalizeSubtitleTargetLang(secondaryTargetLang);
+  }
+  function hasSecondaryOverlayRequirement() {
+    const target = getSecondaryTargetLang();
+    if (!target) return false;
+    return normalizeSubtitleComparisonText(target) !== normalizeSubtitleComparisonText(getEffectiveTargetLang());
+  }
   function shouldUseLlmTranslation(target) {
     const resolved = String(target || "").trim();
     if (!resolved) return false;
@@ -6236,7 +7097,8 @@ Only output the transformed text, nothing else.`,
     ];
     const result = await callPolyscriptLLM(messages, { temperature: llmTemperature });
     const parsed = parseNumberedOutput(result, 1, 0);
-    return parsed[0] || text;
+    const fallback = String(result || "").trim();
+    return parsed[0] || fallback || text;
   }
   var shownTranslationFallbacks = /* @__PURE__ */ new Set();
   function notifyTranslationFallback(message) {
@@ -6305,9 +7167,129 @@ Only output the transformed text, nothing else.`,
   async function translateText(text, target) {
     return await translateTextViaPreferredProvider(text, target);
   }
-  function renderSubtitleOverlay(rawText) {
+  function getSynchronizedSourceSubtitleText({ activeEntry = null, timeMs = null } = {}) {
+    var _a5;
+    if (!showSourceSubtitles && !getSecondaryTargetLang() || !hasExactSubtitleTimeline()) return "";
+    if (usingFullFileTranslation && (activeEntry == null ? void 0 : activeEntry.entry)) {
+      const indexedSource = typeof activeEntry.index === "number" ? String(((_a5 = sourceSubtitleEntries == null ? void 0 : sourceSubtitleEntries[activeEntry.index]) == null ? void 0 : _a5.content) || "").trim() : "";
+      if (indexedSource) return indexedSource;
+      const directSource = String(activeEntry.entry.sourceContent || "").trim();
+      if (directSource) return directSource;
+    }
+    if (!Array.isArray(sourceSubtitleEntries) || !sourceSubtitleEntries.length || !Number.isFinite(Number(timeMs))) {
+      return "";
+    }
+    const sourceMatch = findEntryAtTime(sourceSubtitleEntries, Number(timeMs), lastSourceSubtitleIndex);
+    if (sourceMatch == null ? void 0 : sourceMatch.entry) {
+      lastSourceSubtitleIndex = sourceMatch.index;
+      return String(sourceMatch.entry.content || "").trim();
+    }
+    if (typeof (sourceMatch == null ? void 0 : sourceMatch.index) === "number" && sourceMatch.index >= 0) {
+      lastSourceSubtitleIndex = Math.max(0, sourceMatch.index - 1);
+    }
+    return "";
+  }
+  function buildSubtitleCueToken({ exactTimelineMode, activeEntry, currentText, sourceText, timeMs }) {
+    if (exactTimelineMode && (activeEntry == null ? void 0 : activeEntry.entry)) {
+      const entry = activeEntry.entry;
+      const start = Number(entry == null ? void 0 : entry.startMs);
+      const end = Number(entry == null ? void 0 : entry.endMs);
+      const index = String((entry == null ? void 0 : entry.index) || activeEntry.index || "");
+      return JSON.stringify([
+        index,
+        Number.isFinite(start) ? start : "",
+        Number.isFinite(end) ? end : "",
+        String(currentText || "")
+      ]);
+    }
+    return JSON.stringify([
+      "live",
+      String(currentText || ""),
+      Number.isFinite(Number(timeMs)) ? Math.round(Number(timeMs) / 100) : ""
+    ]);
+  }
+  function normalizeSubtitleComparisonText(text) {
+    return String(text || "").replace(/\\n|\\N/g, "\n").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+  function getDistinctSecondarySubtitleText(sourceText, targetText) {
+    const source = String(sourceText || "").trim();
+    if (!source) return "";
+    return normalizeSubtitleComparisonText(source) !== normalizeSubtitleComparisonText(targetText) ? source : "";
+  }
+  function composeSubtitleScene({ activeEntry, rawCurrentText, timeMs, exactTimelineMode }) {
+    const exactEntry = exactTimelineMode && (activeEntry == null ? void 0 : activeEntry.entry) ? activeEntry.entry : null;
+    if (!exactEntry) {
+      const currentText2 = String(rawCurrentText || "");
+      const secondaryState2 = getSecondarySubtitleState(currentText2, currentText2);
+      if (currentText2 && getSecondaryTargetLang()) {
+        ensureSecondarySubtitleTranslation(currentText2);
+      }
+      return {
+        currentText: currentText2,
+        sourceText: secondaryState2.text,
+        cueToken: buildSubtitleCueToken({
+          exactTimelineMode: false,
+          activeEntry,
+          currentText: currentText2,
+          sourceText: currentText2,
+          timeMs
+        }),
+        hasRenderableCue: !!currentText2.trim() && isSecondarySubtitleSatisfied(secondaryState2)
+      };
+    }
+    const sourceText = getSynchronizedSourceSubtitleText({ activeEntry, timeMs }) || String(exactEntry.sourceContent || "").trim();
+    const entryContent = String(exactEntry.content || "").trim();
+    const sourceContent = String(exactEntry.sourceContent || "").trim();
+    let currentText = "";
+    let primaryReady = false;
+    if (usingFullFileTranslation || usingNativeTargetSubs) {
+      currentText = entryContent;
+      primaryReady = !!currentText;
+    } else {
+      const translatedText = String(exactEntry.translatedContent || "").trim();
+      const cachedText = lineTranslationCache.get(sourceContent || entryContent);
+      currentText = translatedText || String(cachedText || "").trim();
+      primaryReady = !!currentText;
+      if (!primaryReady && (sourceContent || entryContent)) {
+        translateLine(sourceContent || entryContent);
+      }
+    }
+    const cueSourceText = sourceContent || entryContent;
+    const secondarySourceText = usingNativeTargetSubs ? cueSourceText || sourceText : cueSourceText;
+    const secondaryState = getSecondarySubtitleState(secondarySourceText, currentText);
+    const renderSourceText = secondaryState.text || (!secondaryState.required && showSourceSubtitles ? getDistinctSecondarySubtitleText(sourceText, currentText) : "");
+    const hasRenderableCue = primaryReady && !!currentText && isSecondarySubtitleSatisfied(secondaryState);
+    const cueToken = buildSubtitleCueToken({
+      exactTimelineMode: true,
+      activeEntry,
+      currentText,
+      sourceText: secondarySourceText,
+      timeMs
+    });
+    return {
+      currentText,
+      sourceText: renderSourceText,
+      cueToken,
+      hasRenderableCue
+    };
+  }
+  function renderSubtitleOverlay(rawText, sourceText = lastSourceOverlayText) {
     const text = (rawText || "").replace(/\\n|\\N/g, "\n");
+    const sourceLineText = getDistinctSecondarySubtitleText(
+      String(sourceText || "").replace(/\\n|\\N/g, "\n"),
+      text
+    );
+    if (hasSecondaryOverlayRequirement() && !sourceLineText) {
+      return false;
+    }
     lastRenderedText = text;
+    lastRenderedSourceText = sourceLineText;
+    lastRenderedCueToken = subLastDisplayedCueToken || "";
+    const sourceLineHtml = sourceLineText ? `<div class="ps-line ps-line-source">${escapeHtml(sourceLineText)}</div>` : "";
+    const dismissAllPopupsJs = "document.querySelectorAll('.ps-word-container[data-open=true]').forEach((el)=>el.removeAttribute('data-open'));";
+    const scheduleOpenJs = "const container=this.closest('.ps-word-container')||this.parentElement; if(!container)return; clearTimeout(container._psCloseTimer); clearTimeout(container._psHoverTimer); container._psHoverTimer=setTimeout(()=>{ container.setAttribute('data-open','true'); }, 190);";
+    const keepOpenJs = "const container=this.closest('.ps-word-container')||this.parentElement; if(!container)return; clearTimeout(container._psCloseTimer); clearTimeout(container._psHoverTimer); container.setAttribute('data-open','true');";
+    const scheduleCloseJs = "const container=this.closest('.ps-word-container')||this.parentElement; if(!container)return; clearTimeout(container._psHoverTimer); clearTimeout(container._psCloseTimer); container._psCloseTimer=setTimeout(()=>{ container.removeAttribute('data-open'); }, 900);";
     applySubtitleLayout();
     const lines = text.split("\n");
     const wordsToTranslit = /* @__PURE__ */ new Set();
@@ -6326,19 +7308,19 @@ Only output the transformed text, nothing else.`,
         }
         const translitHtml = showTransliteration && cachedTranslit ? `<span class="ps-transliteration">${escapeHtml(cachedTranslit)}</span>` : `<span class="ps-transliteration" style="display:none"></span>`;
         const tooltipHtml = buildTooltipHtml(key, segText);
-        const tooltip = tooltipHtml ? `<div class="ps-tooltip">${tooltipHtml}</div>` : "";
-        const speakWord = getSpeakableText(segText);
-        const wordAttrs = `data-clickable data-word="${escapeHtml(segText)}" data-say="${escapeHtml(speakWord)}" onclick="event.stopPropagation(); if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:tts',{kind:'word',text:this.getAttribute('data-say')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:tts',data:{kind:'word',text:this.getAttribute('data-say')}});} " onmouseenter="if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'word',text:this.getAttribute('data-word')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'word',text:this.getAttribute('data-word')}});} "`;
-        return `<span class="ps-word-container">${translitHtml}<span class="ps-word" ${wordAttrs}>${escapeHtml(segText)}</span>${tooltip}</span>`;
+        const tooltip = tooltipHtml ? `<div class="ps-tooltip" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();" onmouseenter="${keepOpenJs}" onmouseleave="${scheduleCloseJs}" onwheel="event.stopPropagation(); event.preventDefault(); this.scrollTop += event.deltaY;">${tooltipHtml}</div>` : "";
+        const wordAttrs = `data-clickable data-word="${escapeHtml(segText)}" onclick="event.stopPropagation();" onmouseenter="${scheduleOpenJs} if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'word',text:this.getAttribute('data-word')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'word',text:this.getAttribute('data-word')}});} "`;
+        return `<span class="ps-word-container" onmouseleave="${scheduleCloseJs}">${translitHtml}<span class="ps-word" ${wordAttrs}>${escapeHtml(segText)}</span>${tooltip}</span>`;
       }).join("");
       const lineSay = getSpeakableText(line);
-      const lineAttrs = `data-clickable data-line="${escapeHtml(line)}" data-say="${escapeHtml(lineSay)}" onclick="if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:tts',{kind:'line',text:this.getAttribute('data-say')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:tts',data:{kind:'line',text:this.getAttribute('data-say')}});} " onmouseenter="if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'line',text:this.getAttribute('data-line')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'line',text:this.getAttribute('data-line')}});} "`;
+      const lineAttrs = `data-clickable data-line="${escapeHtml(line)}" data-say="${escapeHtml(lineSay)}" onclick="${dismissAllPopupsJs} if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:tts',{kind:'line',text:this.getAttribute('data-say')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:tts',data:{kind:'line',text:this.getAttribute('data-say')}});} " onmouseenter="if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'line',text:this.getAttribute('data-line')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'line',text:this.getAttribute('data-line')}});} "`;
       return `<div class="ps-line" ${lineAttrs}>${words}</div>`;
     }).join("");
     const positionStyle = getOverlayPositionStyle();
     overlay.setContent(`
-    <div class="ps-container" style="${positionStyle}">
+    <div class="ps-container" style="${positionStyle}" onclick="${dismissAllPopupsJs}">
       ${htmlLines || '<div class="ps-line ps-muted">Listening for subtitles...</div>'}
+      ${sourceLineHtml}
     </div>
   `);
     maybeAutoSpeakRenderedText(text);
@@ -6350,6 +7332,7 @@ Only output the transformed text, nothing else.`,
         count += 1;
       });
     }
+    return true;
   }
   function maybeAutoSpeakRenderedText(text) {
     const settings = getTtsSettings();
@@ -6362,7 +7345,11 @@ Only output the transformed text, nothing else.`,
   }
   function clearSubtitleOverlay() {
     lastRenderedText = "";
+    lastRenderedSourceText = "";
+    lastRenderedCueToken = "";
     pendingRenderText = null;
+    pendingRenderSourceText = "";
+    pendingRenderCueToken = "";
     pendingAutoSpeakSerial = 0;
     overlay.setContent(`<div class="ps-container"></div>`);
   }
@@ -6401,6 +7388,13 @@ Only output the transformed text, nothing else.`,
       if (typeof mpv.getString !== "function" || !polyscriptEnabled) {
         return;
       }
+      const currentSourceKey = getSelectedSubtitleSourceKey();
+      if (subtitleEntries && subtitleEntriesSourceKey && currentSourceKey && subtitleEntriesSourceKey !== currentSourceKey) {
+        usingFullFileTranslation = false;
+        usingNativeTargetSubs = false;
+        primeSubtitleEntriesForSelectedTrack("track-change");
+        return;
+      }
       if (!getSelectedSubTrack()) {
         maybeAutoSelectSourceSubtitleTrack("poll");
       }
@@ -6408,8 +7402,29 @@ Only output the transformed text, nothing else.`,
       const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
       const isPaused = typeof mpv.getFlag === "function" ? mpv.getFlag("pause") : false;
       const tMs = typeof timePos === "number" ? timePos * 1e3 : null;
-      const activeEntry = subtitleEntries && tMs != null ? findEntryAtTime(subtitleEntries, tMs, lastSentenceIndex) : { entry: null, index: -1 };
-      const currentText = (usingFullFileTranslation || usingNativeTargetSubs) && (activeEntry == null ? void 0 : activeEntry.entry) ? String(activeEntry.entry.content || "") : rawCurrentText;
+      const activeEntry = subtitleEntries && tMs != null ? findEntryAtTime(subtitleEntries, tMs, lastActiveSubtitleIndex) : { entry: null, index: -1 };
+      if (typeof (activeEntry == null ? void 0 : activeEntry.index) === "number") {
+        if (activeEntry.entry) {
+          lastActiveSubtitleIndex = activeEntry.index;
+        } else if (activeEntry.index >= 0) {
+          lastActiveSubtitleIndex = Math.max(0, activeEntry.index - 1);
+        }
+      } else if (!(activeEntry == null ? void 0 : activeEntry.entry)) {
+        lastActiveSubtitleIndex = -1;
+      }
+      const exactTimelineMode = hasExactSubtitleTimeline();
+      if (exactTimelineMode && (activeEntry == null ? void 0 : activeEntry.entry)) {
+        prefetchExactTimelineTranslations(activeEntry, "poll");
+      }
+      const subtitleScene = composeSubtitleScene({
+        activeEntry,
+        rawCurrentText,
+        timeMs: tMs,
+        exactTimelineMode
+      });
+      const currentText = subtitleScene.currentText;
+      lastSourceOverlayText = subtitleScene.sourceText;
+      const cueToken = subtitleScene.cueToken;
       if (typeof timePos === "number") {
         if (lastTimePos != null && timePos < lastTimePos - 0.5) {
           lastPausedSentenceIndex = -1;
@@ -6419,7 +7434,8 @@ Only output the transformed text, nothing else.`,
       if (sentenceMode && (activeEntry == null ? void 0 : activeEntry.entry) && tMs != null) {
         const { entry, index } = activeEntry;
         if (entry && entry.endMs != null) {
-          if (tMs >= entry.endMs - 250 && !isPaused) {
+          const pauseLeadMs = exactTimelineMode ? FILE_TIMELINE_SENTENCE_PAUSE_LEAD_MS : 250;
+          if (tMs >= entry.endMs - pauseLeadMs && !isPaused) {
             lastSentenceIndex = index;
             handleSentencePause(entry, index);
           }
@@ -6439,32 +7455,45 @@ Only output the transformed text, nothing else.`,
       }
       const now = Date.now();
       const trimmedText = currentText.trim();
+      const hasRenderableCue = subtitleScene.hasRenderableCue;
       const elapsed = subFirstShownAt ? now - subFirstShownAt : Infinity;
       const needsMinHold = !!subLastDisplayedSub && elapsed < contentAwareMinDisplay(subLastDisplayedText);
       const allowMaxDisplayCap = !sentenceMode;
-      if (trimmedText) {
-        if (trimmedText === subSuppressedText) {
-          if (lastSubtitleText) {
+      const useDisplaySmoothing = !exactTimelineMode;
+      if (!exactTimelineMode && !usingFullFileTranslation && !usingNativeTargetSubs && trimmedText) {
+        translateLine(currentText);
+        ensureSecondarySubtitleTranslation(currentText, cueToken);
+        prefetchUpcomingTranslations(currentText);
+      }
+      if (hasRenderableCue) {
+        if (cueToken === subSuppressedCueToken) {
+          if (lastSubtitleText || lastSourceOverlayText) {
             lastSubtitleText = "";
             lastOriginalText = "";
+            lastOriginalCueToken = "";
+            lastOriginalSourceText = "";
             pendingAutoSpeakSerial = 0;
             clearSubtitleOverlay();
           }
           return;
         }
-        if (currentText !== subLastDisplayedText) {
+        if (cueToken !== subLastDisplayedCueToken) {
           subSuppressedText = "";
-          if (needsMinHold) {
+          subSuppressedCueToken = "";
+          if (useDisplaySmoothing && needsMinHold) {
             return;
           }
           subFirstShownAt = now;
           subLastDisplayedText = currentText;
+          subLastDisplayedCueToken = cueToken;
           lastSubtitleText = currentText;
           lastOriginalText = currentText;
+          lastOriginalCueToken = cueToken;
+          lastOriginalSourceText = lastSourceOverlayText;
           subtitleChangeSerial += 1;
           pendingAutoSpeakSerial = !sentenceMode && !isPaused ? subtitleChangeSerial : 0;
           console.log(`POLYSCRIPT: New subtitle: ${currentText}`);
-          if (typeof timePos === "number" && trimmedText && !(activeEntry == null ? void 0 : activeEntry.entry)) {
+          if (!exactTimelineMode && typeof timePos === "number" && trimmedText && !(activeEntry == null ? void 0 : activeEntry.entry)) {
             const tMs2 = Math.round(timePos * 1e3);
             liveTranscriptEntries.push({
               i: liveTranscriptEntries.length,
@@ -6478,45 +7507,73 @@ Only output the transformed text, nothing else.`,
           }
           if (overlayLoaded) {
             if (usingFullFileTranslation) {
-              subLastDisplayedSub = currentText;
-              renderSubtitleOverlay(currentText);
+              subLastDisplayedSub = renderSubtitleOverlay(currentText, lastSourceOverlayText) ? currentText : null;
             } else if (usingNativeTargetSubs) {
-              subLastDisplayedSub = currentText;
-              renderSubtitleOverlay(currentText);
+              subLastDisplayedSub = renderSubtitleOverlay(currentText, lastSourceOverlayText) ? currentText : null;
+            } else if (exactTimelineMode) {
+              subLastDisplayedSub = renderSubtitleOverlay(currentText, lastSourceOverlayText) ? currentText : null;
+              maybeStartExactTimelineFullFileTranslation("playback");
             } else {
               const cached = lineTranslationCache.get(currentText);
               if (cached) {
-                subLastDisplayedSub = cached;
-                renderSubtitleOverlay(cached);
+                const secondaryState = getSecondarySubtitleState(currentText, cached);
+                ensureSecondarySubtitleTranslation(currentText, cueToken);
+                if (isSecondarySubtitleSatisfied(secondaryState)) {
+                  subLastDisplayedSub = renderSubtitleOverlay(cached, secondaryState.text) ? cached : null;
+                } else {
+                  subLastDisplayedSub = null;
+                }
               } else {
-                subLastDisplayedSub = currentText;
+                subLastDisplayedSub = null;
                 translateLine(currentText);
+                ensureSecondarySubtitleTranslation(currentText, cueToken);
               }
               prefetchUpcomingTranslations(currentText);
             }
           }
         } else {
-          if (allowMaxDisplayCap && elapsed > MAX_SUB_DISPLAY_MS) {
+          if (overlayLoaded && hasRenderableCue && !subLastDisplayedSub) {
+            if (usingFullFileTranslation || usingNativeTargetSubs || exactTimelineMode) {
+              subLastDisplayedSub = renderSubtitleOverlay(currentText, lastSourceOverlayText) ? currentText : null;
+            } else {
+              const cached = lineTranslationCache.get(currentText);
+              if (cached) {
+                const secondaryState = getSecondarySubtitleState(currentText, cached);
+                ensureSecondarySubtitleTranslation(currentText, cueToken);
+                if (isSecondarySubtitleSatisfied(secondaryState)) {
+                  subLastDisplayedSub = renderSubtitleOverlay(cached, secondaryState.text) ? cached : null;
+                }
+              }
+            }
+          }
+          if (useDisplaySmoothing && allowMaxDisplayCap && elapsed > MAX_SUB_DISPLAY_MS) {
             subSuppressedText = trimmedText;
+            subSuppressedCueToken = cueToken;
             subLastDisplayedText = "";
+            subLastDisplayedCueToken = "";
             subFirstShownAt = 0;
             subLastDisplayedSub = null;
             lastSubtitleText = "";
             lastOriginalText = "";
+            lastOriginalCueToken = "";
+            lastOriginalSourceText = "";
             pendingAutoSpeakSerial = 0;
             clearSubtitleOverlay();
           }
         }
       } else {
-        if (needsMinHold) {
+        if (useDisplaySmoothing && needsMinHold) {
           return;
         }
         subLastDisplayedText = "";
+        subLastDisplayedCueToken = "";
         subFirstShownAt = 0;
         subLastDisplayedSub = null;
         if (lastSubtitleText) {
           lastSubtitleText = "";
           lastOriginalText = "";
+          lastOriginalCueToken = "";
+          lastOriginalSourceText = "";
           pendingAutoSpeakSerial = 0;
           clearSubtitleOverlay();
         }
@@ -6534,6 +7591,30 @@ Only output the transformed text, nothing else.`,
     } catch {
     }
     return null;
+  }
+  function getSubtitleTrackById(id) {
+    try {
+      const tracks = mpv.getNative("track-list");
+      if (!Array.isArray(tracks)) return null;
+      return tracks.find((t) => t && t.type === "sub" && Number(t.id) === Number(id)) || null;
+    } catch {
+      return null;
+    }
+  }
+  function findSubtitleTrackByExternalPath(path) {
+    const target = String(path || "").trim();
+    if (!target) return null;
+    try {
+      const tracks = mpv.getNative("track-list");
+      if (!Array.isArray(tracks)) return null;
+      return tracks.find((track) => {
+        if (!track || track.type !== "sub") return false;
+        const externalPath = String(track["external-filename"] || track["external_filename"] || "").trim();
+        return externalPath === target;
+      }) || null;
+    } catch {
+      return null;
+    }
   }
   function isAutoSourceSubtitleSelectionEnabled() {
     return autoPickSourceSubtitlesEnabled;
@@ -6553,40 +7634,120 @@ Only output the transformed text, nothing else.`,
       return [];
     }
   }
+  var NATIVE_SUBTITLE_LANG_ALIASES = {
+    iw: "he",
+    jw: "jv",
+    in: "id",
+    mo: "ro",
+    sh: "sr",
+    eng: "en",
+    spa: "es",
+    fra: "fr",
+    fre: "fr",
+    deu: "de",
+    ger: "de",
+    ita: "it",
+    por: "pt",
+    rus: "ru",
+    jpn: "ja",
+    kor: "ko",
+    zho: "zh",
+    chi: "zh",
+    ell: "el",
+    gre: "el",
+    heb: "he",
+    ara: "ar",
+    hin: "hi",
+    nld: "nl",
+    dut: "nl",
+    nor: "no-family",
+    nob: "no-family",
+    nno: "no-family",
+    fil: "fil",
+    tgl: "fil",
+    lat: "la"
+  };
+  function normalizeLangForSubtitleMatch(code) {
+    const raw = String(code || "").trim().toLowerCase().replace(/_/g, "-");
+    if (!raw) return "";
+    const zhSimplified = ["zh", "zh-cn", "zh-sg", "zh-my", "zh-hans"];
+    if (zhSimplified.includes(raw) || raw.startsWith("zh-hans-") || raw.startsWith("zh-cn-") || raw.startsWith("zh-sg-")) {
+      return "zh-hans";
+    }
+    const zhTraditional = ["zh-tw", "zh-hk", "zh-mo", "zh-hant"];
+    if (zhTraditional.includes(raw) || raw.startsWith("zh-hant-") || raw.startsWith("zh-tw-") || raw.startsWith("zh-hk-")) {
+      return "zh-hant";
+    }
+    if (raw === "no" || raw === "nb" || raw === "nn") return "no-family";
+    if (raw === "tl" || raw === "fil") return "fil";
+    if (NATIVE_SUBTITLE_LANG_ALIASES[raw]) return NATIVE_SUBTITLE_LANG_ALIASES[raw];
+    const [base, ...rest] = raw.split("-");
+    const canonicalBase = NATIVE_SUBTITLE_LANG_ALIASES[base] || base;
+    if (canonicalBase === "no-family" || canonicalBase === "fil" || canonicalBase === "zh-hans" || canonicalBase === "zh-hant") {
+      return canonicalBase;
+    }
+    return rest.length ? `${canonicalBase}-${rest.join("-")}` : canonicalBase;
+  }
   function normalizeBaseLang(langCode) {
-    if (!langCode) return "";
-    return String(langCode).trim().toLowerCase().split(/[-_]/)[0];
+    const normalized = normalizeLangForSubtitleMatch(langCode);
+    if (!normalized) return "";
+    if (normalized === "zh-hans" || normalized === "zh-hant" || normalized === "no-family" || normalized === "fil") {
+      return normalized;
+    }
+    return normalized.split(/[-_]/)[0];
   }
   function langMatchesTarget(trackLang, target) {
-    const a = normalizeBaseLang(trackLang);
-    const b = normalizeBaseLang(target);
-    return a && b && a === b;
+    const available = normalizeLangForSubtitleMatch(trackLang);
+    const requested = normalizeLangForSubtitleMatch(target);
+    if (!available || !requested) return false;
+    if (available === requested) return true;
+    if (available.startsWith(requested + "-")) return true;
+    if (requested.startsWith(available + "-")) return true;
+    return normalizeBaseLang(available) === normalizeBaseLang(requested);
+  }
+  function getLanguageSearchTokens(value) {
+    const tokens = /* @__PURE__ */ new Set();
+    const raw = String(value || "").trim();
+    if (!raw) return tokens;
+    const resolvedCode = resolveLanguageInput(raw);
+    const normalizedCode = normalizeLangForSubtitleMatch(resolvedCode || raw);
+    const baseCode = normalizeBaseLang(normalizedCode);
+    const displayName = resolvedCode ? getLangLabel(resolvedCode) : "";
+    [raw, resolvedCode, normalizedCode, baseCode, displayName].forEach((candidate) => {
+      const normalized = String(candidate || "").trim().toLowerCase();
+      if (normalized) tokens.add(normalized);
+    });
+    return tokens;
   }
   function findNativeTargetTrack(target) {
     const tracks = listSubtitleTracks();
+    const targetTokens = getLanguageSearchTokens(target);
     for (const track of tracks) {
       const lang = track.lang || track.language || "";
       if (langMatchesTarget(lang, target)) {
         return track;
       }
-      const title = String(track.title || "").toLowerCase();
-      const targetBase = normalizeBaseLang(target);
-      if (targetBase && title.includes(targetBase)) {
+      const title = String(track.title || "").toLowerCase().trim();
+      if (!title) continue;
+      const titleParts = title.split(/[^a-z\u00c0-\u024f\u0370-\u03ff]+/u).filter(Boolean);
+      const titleTokenSet = new Set(titleParts);
+      if ([...targetTokens].some((token) => token && (titleTokenSet.has(token) || title.includes(token)))) {
         return track;
       }
     }
     return null;
   }
   function primeSubtitleEntriesForSelectedTrack(reason = "selected-track") {
-    subtitleEntries = null;
-    lastSentenceIndex = -1;
+    clearSubtitleEntriesState();
     void ensureSentenceEntries().then((ok) => {
       if (!ok) {
         console.log(`POLYSCRIPT: No parsed subtitle entries available for ${reason}.`);
         syncNativeSubtitleVisibility();
         return;
       }
+      maybeStartExactTimelineFullFileTranslation(reason);
       loadTranscriptFromCurrentSubs();
+      restartSubtitlePoller();
       syncNativeSubtitleVisibility();
     }).catch((error) => {
       console.log(`POLYSCRIPT-ERROR: Failed to prepare subtitle entries for ${reason}: ${String((error == null ? void 0 : error.message) || error)}`);
@@ -6594,7 +7755,7 @@ Only output the transformed text, nothing else.`,
     });
   }
   function tryUseNativeTargetSubtitles() {
-    var _a4;
+    var _a5;
     if (!useNativeSubsWhenAvailable || !polyscriptEnabled) return false;
     const effectiveTarget = getEffectiveTargetLang();
     if (!effectiveTarget) return false;
@@ -6609,7 +7770,7 @@ Only output the transformed text, nothing else.`,
       usingNativeTargetSubs = true;
       sourceTrackAutoSelectedForFile = true;
       const sourceCandidate = pickSecondarySourceTrack(nativeTrack.id);
-      lastSourceSubId = (_a4 = sourceCandidate == null ? void 0 : sourceCandidate.id) != null ? _a4 : null;
+      lastSourceSubId = (_a5 = sourceCandidate == null ? void 0 : sourceCandidate.id) != null ? _a5 : null;
       primeSubtitleEntriesForSelectedTrack("native-target");
       const label = String(nativeTrack.title || nativeTrack.lang || nativeTrack.language || nativeTrack.id);
       core.osd(`POLYSCRIPT: Using native ${label} subtitles`, 2e3);
@@ -6645,7 +7806,7 @@ Only output the transformed text, nothing else.`,
     return { lang: availableLangs[0], reason: "last_resort" };
   }
   function pickBestSourceSubtitleTrack(tracks, targetLangOverride) {
-    var _a4, _b;
+    var _a5, _b;
     if (!Array.isArray(tracks) || !tracks.length) return null;
     const availableLangs = tracks.map((t) => t.lang || t.language || "").filter(Boolean);
     const effectiveTarget = targetLangOverride || getEffectiveTargetLang();
@@ -6676,7 +7837,7 @@ Only output the transformed text, nothing else.`,
       return Number(a.track.id) - Number(b.track.id);
     });
     if (routing) {
-      const winner = (_a4 = scored[0]) == null ? void 0 : _a4.track;
+      const winner = (_a5 = scored[0]) == null ? void 0 : _a5.track;
       const winnerLang = winner ? winner.lang || winner.language || "?" : "?";
       console.log(`POLYSCRIPT: Source language routing: target=${effectiveTarget}, optimal=${routing.lang} (${routing.reason}), selected=${winnerLang}`);
     }
@@ -6725,12 +7886,30 @@ Only output the transformed text, nothing else.`,
       return null;
     }
   }
+  function getSubtitleFilePathForTrack(track) {
+    try {
+      if (!track) return null;
+      return track["external-filename"] || track["external_filename"] || null;
+    } catch {
+      return null;
+    }
+  }
   function getEmbeddedSubTrackIndex() {
-    var _a4;
+    var _a5;
     try {
       const track = getSelectedSubTrack();
       if (!track) return null;
-      const ffIndex = (_a4 = track["ff-index"]) != null ? _a4 : track["ff_index"];
+      const ffIndex = (_a5 = track["ff-index"]) != null ? _a5 : track["ff_index"];
+      return typeof ffIndex === "number" ? ffIndex : null;
+    } catch {
+      return null;
+    }
+  }
+  function getEmbeddedSubTrackIndexForTrack(track) {
+    var _a5;
+    try {
+      if (!track) return null;
+      const ffIndex = (_a5 = track["ff-index"]) != null ? _a5 : track["ff_index"];
       return typeof ffIndex === "number" ? ffIndex : null;
     } catch {
       return null;
@@ -6745,6 +7924,42 @@ Only output the transformed text, nothing else.`,
       return null;
     }
   }
+  function getSelectedSubtitleSourceKey() {
+    var _a5, _b;
+    try {
+      const track = getSelectedSubTrack();
+      if (!track) return "";
+      const externalPath = String(track["external-filename"] || track["external_filename"] || "").trim();
+      const ffIndex = (_b = (_a5 = track["ff-index"]) != null ? _a5 : track["ff_index"]) != null ? _b : "";
+      const trackId = typeof track.id === "number" ? track.id : "";
+      const videoPath = String(getVideoPath() || "").trim();
+      return JSON.stringify([trackId, externalPath, ffIndex, videoPath]);
+    } catch {
+      return "";
+    }
+  }
+  function hasTimedSubtitleEntry(entry) {
+    return Number.isFinite(Number(entry == null ? void 0 : entry.startMs)) && Number.isFinite(Number(entry == null ? void 0 : entry.endMs));
+  }
+  function hasExactSubtitleTimeline() {
+    return Array.isArray(subtitleEntries) && subtitleEntries.length > 0 && subtitleEntries.some((entry) => hasTimedSubtitleEntry(entry)) && !sentenceLiveMode;
+  }
+  function clearSubtitleEntriesState() {
+    subtitleEntries = null;
+    sourceSubtitleEntries = null;
+    subtitleEntriesSourceKey = "";
+    sourceSubtitleEntriesSourceKey = "";
+    lastSentenceIndex = -1;
+    lastActiveSubtitleIndex = -1;
+    lastSourceSubtitleIndex = -1;
+    lastPausedSentenceIndex = -1;
+    sentenceLiveMode = false;
+    sentenceLivePendingAccept = false;
+    lastSourceOverlayText = "";
+  }
+  function getSubtitlePollIntervalMs() {
+    return hasExactSubtitleTimeline() ? FILE_TIMELINE_SUBTITLE_POLL_MS : LIVE_SUBTITLE_POLL_MS;
+  }
   async function extractEmbeddedSubToSrt() {
     if (!utils || typeof utils.fileInPath !== "function" || typeof utils.exec !== "function") {
       return null;
@@ -6754,6 +7969,22 @@ Only output the transformed text, nothing else.`,
     const ffIndex = getEmbeddedSubTrackIndex();
     if (!videoPath || ffIndex == null) return null;
     const outPath = `/tmp/polyscript_embedded_${Date.now()}.srt`;
+    const args = ["-y", "-i", videoPath, "-map", `0:s:${ffIndex}`, outPath];
+    const result = await utils.exec("ffmpeg", args, null, null, null);
+    if (result && result.status === 0 && file.exists(outPath)) {
+      return outPath;
+    }
+    return null;
+  }
+  async function extractEmbeddedSubToSrtForTrack(track) {
+    if (!utils || typeof utils.fileInPath !== "function" || typeof utils.exec !== "function") {
+      return null;
+    }
+    if (!utils.fileInPath("ffmpeg")) return null;
+    const videoPath = getVideoPath();
+    const ffIndex = getEmbeddedSubTrackIndexForTrack(track);
+    if (!videoPath || ffIndex == null) return null;
+    const outPath = `/tmp/polyscript_embedded_${Date.now()}_${ffIndex}.srt`;
     const args = ["-y", "-i", videoPath, "-map", `0:s:${ffIndex}`, outPath];
     const result = await utils.exec("ffmpeg", args, null, null, null);
     if (result && result.status === 0 && file.exists(outPath)) {
@@ -6793,6 +8024,9 @@ Only output the transformed text, nothing else.`,
   }
   function enforceMinCueDuration(entries) {
     if (!entries || !entries.length) return entries;
+    if (entries.some((entry) => hasTimedSubtitleEntry(entry))) {
+      return entries;
+    }
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
       if (e.startMs == null || e.endMs == null) continue;
@@ -6811,11 +8045,13 @@ Only output the transformed text, nothing else.`,
     return entries;
   }
   async function ensureSentenceEntries() {
-    if (subtitleEntries && subtitleEntries.length) {
+    const currentSourceKey = getSelectedSubtitleSourceKey();
+    if (subtitleEntries && subtitleEntries.length && subtitleEntriesSourceKey === currentSourceKey) {
       sentenceLiveMode = false;
       sentenceLivePendingAccept = false;
       return true;
     }
+    clearSubtitleEntriesState();
     let path = getSubtitleFilePath();
     if (path && !path.toLowerCase().endsWith(".srt")) {
       path = null;
@@ -6828,13 +8064,88 @@ Only output the transformed text, nothing else.`,
       const raw = file.read(path);
       if (!raw) return false;
       subtitleEntries = parseSrt(raw);
-      enforceMinCueDuration(subtitleEntries);
-      lastSentenceIndex = -1;
-      lastPausedSentenceIndex = -1;
+      subtitleEntriesSourceKey = currentSourceKey || path;
       sentenceLiveMode = false;
       sentenceLivePendingAccept = false;
       return !!subtitleEntries.length;
     } catch {
+      clearSubtitleEntriesState();
+      return false;
+    }
+  }
+  async function ensureSourceSubtitleEntries() {
+    var _a5;
+    if (!showSourceSubtitles && !getSecondaryTargetLang() || !hasExactSubtitleTimeline()) {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
+      lastSourceOverlayText = "";
+      return false;
+    }
+    if (usingFullFileTranslation && Array.isArray(subtitleEntries) && subtitleEntries.length) {
+      const sourceKey2 = `translated:${subtitleEntriesSourceKey}`;
+      if (sourceSubtitleEntriesSourceKey === sourceKey2 && (sourceSubtitleEntries == null ? void 0 : sourceSubtitleEntries.length)) {
+        return true;
+      }
+      sourceSubtitleEntries = subtitleEntries.map((entry) => ({
+        index: entry.index,
+        time: entry.time,
+        content: String(entry.sourceContent || "").trim(),
+        startMs: entry.startMs,
+        endMs: entry.endMs
+      })).filter((entry) => entry.content);
+      sourceSubtitleEntriesSourceKey = sourceKey2;
+      lastSourceSubtitleIndex = -1;
+      return sourceSubtitleEntries.length > 0;
+    }
+    if (!usingNativeTargetSubs) {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
+      lastSourceOverlayText = "";
+      return false;
+    }
+    const selectedTrack = getSelectedSubTrack();
+    const selectedId = selectedTrack && typeof selectedTrack.id === "number" ? selectedTrack.id : null;
+    const sourceTrack = lastSourceSubId != null && lastSourceSubId !== selectedId ? getSubtitleTrackById(lastSourceSubId) : pickSecondarySourceTrack(selectedId);
+    if (!sourceTrack || typeof sourceTrack.id !== "number") {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
+      lastSourceOverlayText = "";
+      return false;
+    }
+    lastSourceSubId = sourceTrack.id;
+    const sourceKey = JSON.stringify([sourceTrack.id, getSubtitleFilePathForTrack(sourceTrack) || "", (_a5 = getEmbeddedSubTrackIndexForTrack(sourceTrack)) != null ? _a5 : "", String(getVideoPath() || "").trim()]);
+    if (sourceSubtitleEntriesSourceKey === sourceKey && (sourceSubtitleEntries == null ? void 0 : sourceSubtitleEntries.length)) {
+      return true;
+    }
+    let path = getSubtitleFilePathForTrack(sourceTrack);
+    if (path && !path.toLowerCase().endsWith(".srt")) {
+      path = null;
+    }
+    if (!path) {
+      path = await extractEmbeddedSubToSrtForTrack(sourceTrack);
+    }
+    if (!path) {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
+      lastSourceOverlayText = "";
+      return false;
+    }
+    try {
+      const raw = file.read(path);
+      if (!raw) return false;
+      sourceSubtitleEntries = parseSrt(raw);
+      sourceSubtitleEntriesSourceKey = sourceKey;
+      lastSourceSubtitleIndex = -1;
+      return !!sourceSubtitleEntries.length;
+    } catch {
+      sourceSubtitleEntries = null;
+      sourceSubtitleEntriesSourceKey = "";
+      lastSourceSubtitleIndex = -1;
+      lastSourceOverlayText = "";
       return false;
     }
   }
@@ -6848,12 +8159,15 @@ ${e.content}
     if (!entries || !entries.length || tMs == null) return { entry: null, index: -1 };
     let i = Math.max(0, lastIndex || 0);
     if (entries[i] && entries[i].startMs != null && tMs < entries[i].startMs) {
-      i = 0;
+      i = Math.max(0, i - 2);
     }
     while (i < entries.length) {
       const e = entries[i];
       if (e.startMs != null && e.endMs != null) {
-        if (tMs >= e.startMs && tMs <= e.endMs) return { entry: e, index: i };
+        const nextEntry = entries[i + 1];
+        const nextStart = Number(nextEntry == null ? void 0 : nextEntry.startMs);
+        const effectiveEnd = Number.isFinite(nextStart) ? Math.min(Number(e.endMs), nextStart) : Number(e.endMs);
+        if (tMs >= e.startMs && tMs < effectiveEnd) return { entry: e, index: i };
         if (tMs < e.startMs) return { entry: null, index: i };
       }
       i += 1;
@@ -6889,6 +8203,89 @@ ${e.content}
     await flushChunk();
     return results;
   }
+  async function translatePreparedSubtitleEntries(entries, targetLang2) {
+    const texts = entries.map((entry) => String((entry == null ? void 0 : entry.content) || "").replace(/\n/g, " <|ps_line|> "));
+    if (!texts.length) return [];
+    if (!shouldUseLlmTranslation(targetLang2)) {
+      return translateBatch(texts, targetLang2);
+    }
+    const results = new Array(texts.length).fill("");
+    let nextIndex = 0;
+    const workerCount = Math.max(1, Math.min(PREPARED_SUBTITLE_LLM_CONCURRENCY, texts.length));
+    const worker = async () => {
+      while (nextIndex < texts.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const text = texts[index];
+        try {
+          results[index] = await translateText(text, targetLang2);
+        } catch (error) {
+          console.log(`POLYSCRIPT-WARN: Prepared subtitle line translation failed at ${index}: ${String((error == null ? void 0 : error.message) || error)}`);
+          results[index] = "";
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+  }
+  function getPreparedSubtitleTranslationKey(sourcePath, targetLang2) {
+    return JSON.stringify([
+      String(sourcePath || "").trim(),
+      String(getVideoPath() || "").trim(),
+      String(targetLang2 || "").trim(),
+      translationProvider,
+      llmMode,
+      llmCustomTarget,
+      llmMetaPrompt,
+      llmCustomPrompt,
+      llmModel
+    ]);
+  }
+  async function activatePreparedSubtitleTrack(outPath, entries) {
+    let selectedTrack = findSubtitleTrackByExternalPath(outPath);
+    if (!selectedTrack) {
+      mpv.command("sub-add", [outPath, "select"]);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      selectedTrack = findSubtitleTrackByExternalPath(outPath);
+    }
+    if (!selectedTrack || typeof selectedTrack.id !== "number") {
+      throw new Error("Prepared translated subtitle track was not added to mpv.");
+    }
+    mpv.set("sid", selectedTrack.id);
+    lastTranslatedSubPath = outPath;
+    usingFullFileTranslation = true;
+    usingNativeTargetSubs = false;
+    subtitleEntries = entries;
+    subtitleEntriesSourceKey = JSON.stringify([selectedTrack.id, outPath, "", String(getVideoPath() || "").trim()]);
+    lastSentenceIndex = -1;
+    exactTimelineFullFileTranslationRequestKey = "";
+    emitTranscriptEntries();
+    loadTranscriptFromCurrentSubs();
+    restartSubtitlePoller();
+    syncNativeSubtitleVisibility();
+  }
+  function activatePreparedSubtitleTimeline(entries, sourceKey) {
+    lastTranslatedSubPath = "";
+    usingFullFileTranslation = true;
+    usingNativeTargetSubs = false;
+    subtitleEntries = entries;
+    subtitleEntriesSourceKey = String(sourceKey || getSelectedSubtitleSourceKey() || "").trim();
+    sourceSubtitleEntries = entries.map((entry) => ({
+      index: entry.index,
+      time: entry.time,
+      content: String(entry.sourceContent || "").trim(),
+      startMs: entry.startMs,
+      endMs: entry.endMs
+    })).filter((entry) => entry.content);
+    sourceSubtitleEntriesSourceKey = `prepared:${subtitleEntriesSourceKey}`;
+    lastSentenceIndex = -1;
+    lastSourceSubtitleIndex = -1;
+    exactTimelineFullFileTranslationRequestKey = "";
+    emitTranscriptEntries();
+    loadTranscriptFromCurrentSubs();
+    restartSubtitlePoller();
+    syncNativeSubtitleVisibility();
+  }
   async function translateCurrentSubtitleFile() {
     if (translatingFile || !polyscriptEnabled) return;
     if (tryUseNativeTargetSubtitles()) return;
@@ -6913,17 +8310,41 @@ ${e.content}
       const raw = file.read(path);
       if (!raw) throw new Error("Could not read subtitle file.");
       const entries = parseSrt(raw);
-      const texts = entries.map((e) => e.content.replace(/\n/g, " <|ps_line|> "));
+      const sourceSelectionKey = getSelectedSubtitleSourceKey() || path;
+      const usePreparedOverlayTimeline = entries.some((entry) => hasTimedSubtitleEntry(entry));
       const effectiveTarget = getEffectiveTargetLang();
-      const translations = await translateBatch(texts, effectiveTarget);
+      const cachePath = buildPreparedSubtitleCachePath(getPreparedSubtitleTranslationKey(path, effectiveTarget));
+      if (file.exists(cachePath)) {
+        const cachedRaw = file.read(cachePath);
+        if (cachedRaw) {
+          const cachedEntries = parseSrt(cachedRaw).map((entry, index) => {
+            var _a5;
+            return {
+              ...entry,
+              sourceContent: String(((_a5 = entries[index]) == null ? void 0 : _a5.content) || "")
+            };
+          });
+          if (jobId !== currentTranslateJobId) return;
+          if (usePreparedOverlayTimeline) {
+            activatePreparedSubtitleTimeline(cachedEntries, sourceSelectionKey);
+            core.osd("POLYSCRIPT: Loaded prepared translated timeline.", 2500);
+          } else {
+            await activatePreparedSubtitleTrack(cachePath, cachedEntries);
+            core.osd("POLYSCRIPT: Loaded prepared translated subtitles.", 2500);
+          }
+          return;
+        }
+      }
+      const translations = await translatePreparedSubtitleEntries(entries, effectiveTarget);
       if (jobId !== currentTranslateJobId) return;
       translations.forEach((t, i) => {
-        const restored = (t || "").replace(/\s*<\|ps_line\|>\s*/g, "\n");
+        entries[i].sourceContent = entries[i].content;
+        const restored = String(t || "").replace(/\s*<\|ps_line\|>\s*/g, "\n").trim();
         entries[i].content = restored || entries[i].content;
       });
       enforceMinCueDuration(entries);
       const translatedSrt = buildSrt(entries);
-      const outPath = `/tmp/polyscript_translated_${Date.now()}.srt`;
+      const outPath = cachePath;
       file.write(outPath, translatedSrt);
       const prevTrack = getSelectedSubTrack();
       const prevId = prevTrack && typeof prevTrack.id === "number" ? prevTrack.id : null;
@@ -6931,28 +8352,15 @@ ${e.content}
         lastNativeSubId = prevId;
         lastSourceSubId = prevId;
       }
-      mpv.command("sub-add", [outPath, "select"]);
-      setTimeout(() => {
-        try {
-          const tracks = mpv.getNative("track-list");
-          if (!Array.isArray(tracks)) return;
-          const newTrack = tracks.find(
-            (t) => t.type === "sub" && (t["external-filename"] === outPath || t["external_filename"] === outPath)
-          );
-          if (newTrack && typeof newTrack.id === "number") {
-            mpv.set("sid", newTrack.id);
-            lastTranslatedSubPath = outPath;
-            usingFullFileTranslation = true;
-            usingNativeTargetSubs = false;
-            subtitleEntries = entries;
-            lastSentenceIndex = -1;
-            syncNativeSubtitleVisibility();
-          }
-        } catch {
-        }
-      }, 300);
-      core.osd("POLYSCRIPT: Translated subtitles loaded.", 3e3);
+      if (usePreparedOverlayTimeline) {
+        activatePreparedSubtitleTimeline(entries, sourceSelectionKey);
+        core.osd("POLYSCRIPT: Translated timeline ready.", 3e3);
+      } else {
+        await activatePreparedSubtitleTrack(outPath, entries);
+        core.osd("POLYSCRIPT: Translated subtitles loaded.", 3e3);
+      }
     } catch (e) {
+      exactTimelineFullFileTranslationRequestKey = "";
       console.log(`POLYSCRIPT-ERROR: Subtitle translation failed: ${e.message}`);
       core.osd("POLYSCRIPT: Subtitle translation failed.", 3e3);
     } finally {
@@ -6964,15 +8372,68 @@ ${e.content}
     const cached = lineTranslationCache.get(sourceText);
     return cached || sourceText;
   }
+  function getEntryDisplayText(entry) {
+    if (!entry || typeof entry !== "object") return "";
+    const sourceText = String(entry.sourceContent || entry.content || "");
+    if (usingNativeTargetSubs || usingFullFileTranslation) {
+      return String(entry.content || "");
+    }
+    const translatedText = String(entry.translatedContent || "").trim();
+    if (translatedText) return translatedText;
+    const cached = lineTranslationCache.get(sourceText);
+    if (cached && String(cached).trim()) return String(cached);
+    return sourceText;
+  }
+  function hasAnyTranslatedTimelineEntries() {
+    if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
+    if (hasExactSubtitleTimeline() && !usingFullFileTranslation && !usingNativeTargetSubs) return false;
+    if (usingFullFileTranslation || usingNativeTargetSubs) return true;
+    return subtitleEntries.some((entry) => {
+      const translated = String((entry == null ? void 0 : entry.translatedContent) || "").trim();
+      if (translated) return true;
+      const sourceText = String((entry == null ? void 0 : entry.sourceContent) || (entry == null ? void 0 : entry.content) || "");
+      const cached = lineTranslationCache.get(sourceText);
+      return !!String(cached || "").trim() && String(cached || "").trim() !== sourceText.trim();
+    });
+  }
+  function dedupeTranscriptRows(rows) {
+    if (!Array.isArray(rows) || rows.length <= 1) return Array.isArray(rows) ? rows : [];
+    const seen = /* @__PURE__ */ new Set();
+    const deduped = [];
+    rows.forEach((row) => {
+      const key = JSON.stringify([
+        Number(row == null ? void 0 : row.s),
+        Number(row == null ? void 0 : row.e),
+        String((row == null ? void 0 : row.t) || ""),
+        String((row == null ? void 0 : row.src) || "")
+      ]);
+      if (seen.has(key)) return;
+      seen.add(key);
+      deduped.push(row);
+    });
+    return deduped;
+  }
   function emitTranscriptEntries() {
     if (!subtitleEntries || !subtitleEntries.length) return;
-    const lightweight = subtitleEntries.map((e, i) => ({
+    if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
+      sendSidebarMessage("ps:transcript", { entries: [] });
+      return;
+    }
+    const sortedEntries = [...subtitleEntries].sort((a, b) => {
+      const aStart = Number(a == null ? void 0 : a.startMs);
+      const bStart = Number(b == null ? void 0 : b.startMs);
+      if (Number.isFinite(aStart) && Number.isFinite(bStart) && aStart !== bStart) {
+        return aStart - bStart;
+      }
+      return String((a == null ? void 0 : a.index) || "").localeCompare(String((b == null ? void 0 : b.index) || ""), void 0, { numeric: true });
+    });
+    const lightweight = dedupeTranscriptRows(sortedEntries.map((e, i) => ({
       i,
       s: e.startMs,
       e: e.endMs,
-      t: transcriptTextForLine(e.content),
-      src: e.content
-    }));
+      t: getEntryDisplayText(e),
+      src: String(e.sourceContent || e.content || "")
+    })));
     sendSidebarMessage("ps:transcript", { entries: lightweight });
   }
   function emitLiveTranscriptEntries() {
@@ -6988,7 +8449,7 @@ ${e.content}
       const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
       if (typeof timePos !== "number") return;
       const tMs = Math.round(timePos * 1e3);
-      if (Math.abs(tMs - lastTranscriptTimePos) < 200) return;
+      if (Math.abs(tMs - lastTranscriptTimePos) < TRANSCRIPT_TIME_EMIT_GRANULARITY_MS) return;
       lastTranscriptTimePos = tMs;
       sendSidebarMessage("ps:transcriptTime", { t: tMs });
     } catch {
@@ -6997,7 +8458,7 @@ ${e.content}
   function startTranscriptTimePoll() {
     stopTranscriptTimePoll();
     if (!sidebarVisible) return;
-    transcriptTimePollTimer = setInterval(emitTranscriptTimePos, 300);
+    transcriptTimePollTimer = setInterval(emitTranscriptTimePos, TRANSCRIPT_TIME_POLL_MS);
   }
   function stopTranscriptTimePoll() {
     if (transcriptTimePollTimer) {
@@ -7019,8 +8480,8 @@ ${e.content}
       const entries = subtitleEntries && subtitleEntries.length ? subtitleEntries.map((e) => ({
         startMs: e.startMs,
         endMs: e.endMs,
-        source: e.content,
-        translated: transcriptTextForLine(e.content)
+        source: String(e.sourceContent || e.content || ""),
+        translated: getEntryDisplayText(e)
       })) : liveTranscriptEntries.map((e) => ({
         startMs: e.s,
         endMs: e.e,
@@ -7050,13 +8511,26 @@ ${e.content}
   function loadTranscriptFromCurrentSubs() {
     try {
       if (subtitleEntries && subtitleEntries.length) {
-        enforceMinCueDuration(subtitleEntries);
-        emitTranscriptEntries();
+        if (hasExactSubtitleTimeline()) {
+          maybeStartExactTimelineFullFileTranslation("transcript-load");
+        }
+        if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
+          sendSidebarMessage("ps:transcript", { entries: [] });
+        } else {
+          emitTranscriptEntries();
+        }
         return;
       }
       ensureSentenceEntries().then((ok) => {
         if (ok && subtitleEntries && subtitleEntries.length) {
-          emitTranscriptEntries();
+          if (hasExactSubtitleTimeline()) {
+            maybeStartExactTimelineFullFileTranslation("transcript-load");
+          }
+          if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
+            sendSidebarMessage("ps:transcript", { entries: [] });
+          } else {
+            emitTranscriptEntries();
+          }
         } else {
           if (liveTranscriptEntries.length) {
             sendSidebarMessage("ps:transcript", { entries: liveTranscriptEntries });
@@ -7068,6 +8542,12 @@ ${e.content}
     } catch {
     }
   }
+  function restartSubtitlePoller() {
+    if (subtitlePollTimer) {
+      clearInterval(subtitlePollTimer);
+    }
+    subtitlePollTimer = setInterval(pollForSubtitleChanges, getSubtitlePollIntervalMs());
+  }
   function initializeSubtitleSystem() {
     core.osd("Polyscript is active.", 5e3);
     if (polyscriptEnabled) {
@@ -7076,24 +8556,21 @@ ${e.content}
       maybeAutoSelectSourceSubtitleTrack("initialize");
       ensureSentenceEntries().then((ok) => {
         if (ok) {
+          maybeStartExactTimelineFullFileTranslation("initialize");
           prefetchFirstLines();
           loadTranscriptFromCurrentSubs();
+          restartSubtitlePoller();
         }
       }).catch(() => {
       });
     }
-    if (subtitlePollTimer) {
-      clearInterval(subtitlePollTimer);
-    }
-    subtitlePollTimer = setInterval(pollForSubtitleChanges, 100);
+    restartSubtitlePoller();
     startTranscriptTimePoll();
   }
   event.on("iina.file-loaded", () => {
     usingFullFileTranslation = false;
     usingNativeTargetSubs = false;
-    subtitleEntries = null;
-    lastSentenceIndex = -1;
-    lastPausedSentenceIndex = -1;
+    clearSubtitleEntriesState();
     lastTimePos = null;
     sourceTrackAutoSelectedForFile = false;
     sourceTrackSelectionAttempts = 0;
@@ -7114,12 +8591,12 @@ ${e.content}
     }
   });
   event.on("iina.window-loaded", () => {
-    var _a4;
+    var _a5;
     buildMenu();
     ensureOverlayLoaded();
     syncNativeSubtitleVisibility();
     try {
-      (_a4 = sidebar == null ? void 0 : sidebar.loadFile) == null ? void 0 : _a4.call(sidebar, "dist/ui/sidebar/index.html");
+      (_a5 = sidebar == null ? void 0 : sidebar.loadFile) == null ? void 0 : _a5.call(sidebar, "dist/ui/sidebar/index.html");
     } catch (e) {
       console.log(`POLYSCRIPT-ERROR: Failed to load sidebar: ${e.message}`);
     }

@@ -23615,6 +23615,22 @@
     const s = totalSec % 60;
     return `${m}:${String(s).padStart(2, "0")}`;
   }
+  function findActiveTranscriptIndex(entries, timeMs) {
+    if (!Array.isArray(entries) || !entries.length || !Number.isFinite(Number(timeMs))) return -1;
+    const currentTime = Number(timeMs);
+    for (let i = entries.length - 1; i >= 0; i -= 1) {
+      const entry = entries[i];
+      const start = Number(entry == null ? void 0 : entry.s);
+      const end = Number(entry == null ? void 0 : entry.e);
+      if (!Number.isFinite(start)) continue;
+      if (Number.isFinite(end)) {
+        if (currentTime >= start && currentTime <= end) return i;
+        continue;
+      }
+      if (currentTime >= start) return i;
+    }
+    return -1;
+  }
   function TranscriptPanel({ entries, timeMs, search, onSearchChange, activeRef, showOriginal, onToggleOriginal }) {
     const query = (search || "").trim().toLowerCase();
     const hasDistinctOriginal = entries.some((entry) => {
@@ -23627,15 +23643,7 @@
       const original = String((e == null ? void 0 : e.src) || "").toLowerCase();
       return translated.includes(query) || original.includes(query);
     }) : entries;
-    let activeIdx = -1;
-    if (!query) {
-      for (let i = filtered.length - 1; i >= 0; i--) {
-        if (filtered[i].s != null && timeMs >= filtered[i].s) {
-          activeIdx = i;
-          break;
-        }
-      }
-    }
+    const activeIdx = query ? -1 : findActiveTranscriptIndex(filtered, timeMs);
     return /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card ps-transcript-card" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-header" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Transcript"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-header-right" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-count" }, filtered.length, query ? ` / ${entries.length}` : "", " lines"), entries.length > 0 ? /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
@@ -23663,7 +23671,7 @@
         "aria-pressed": showOriginal
       },
       /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-track" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-thumb" })),
-      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-label" }, "Original")
+      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-label" }, "Show Secondary")
     )) : null, query && filtered.length < entries.length ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-filter-info" }, /* @__PURE__ */ import_react.default.createElement("span", null, "Showing ", filtered.length, " matches"), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-transcript-clear-btn", type: "button", onClick: () => onSearchChange("") }, "Clear")) : null, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-list" }, filtered.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-title" }, entries.length === 0 ? "No transcript yet" : "No matches"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-body" }, entries.length === 0 ? "Play a video with subtitles to see the transcript here." : "Try a different search term.")) : filtered.map((entry, i) => {
       const isActive = i === activeIdx;
       return /* @__PURE__ */ import_react.default.createElement(
@@ -23671,6 +23679,7 @@
         {
           key: entry.i,
           ref: isActive ? activeRef : null,
+          "data-entry-id": String(entry.i),
           className: `ps-transcript-line${isActive ? " is-active" : ""}`
         },
         /* @__PURE__ */ import_react.default.createElement(
@@ -23698,6 +23707,12 @@
     const option = options.find((item) => item.kind === "google" && item.code === code);
     return (option == null ? void 0 : option.rawLabel) || code;
   }
+  function getLanguageDisplay(value, options) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const option = options.find((item) => item.kind === "google" && item.code === raw);
+    return (option == null ? void 0 : option.rawLabel) || raw;
+  }
   var SENTENCE_RESUME_OPTIONS = [
     { value: "0", label: "Off" },
     { value: "2", label: "2 seconds" },
@@ -23705,12 +23720,15 @@
     { value: "5", label: "5 seconds" }
   ];
   var App = () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
     const [settings, setSettings] = (0, import_react.useState)(null);
     const [loginEmailDraft, setLoginEmailDraft] = (0, import_react.useState)("");
     const [targetInput, setTargetInput] = (0, import_react.useState)("");
+    const [secondaryTargetInput, setSecondaryTargetInput] = (0, import_react.useState)("");
     const [targetMenuOpen, setTargetMenuOpen] = (0, import_react.useState)(false);
     const [targetActiveIndex, setTargetActiveIndex] = (0, import_react.useState)(-1);
+    const [secondaryMenuOpen, setSecondaryMenuOpen] = (0, import_react.useState)(false);
+    const [secondaryActiveIndex, setSecondaryActiveIndex] = (0, import_react.useState)(-1);
     const [customTargetDraft, setCustomTargetDraft] = (0, import_react.useState)("");
     const [metaPromptDraft, setMetaPromptDraft] = (0, import_react.useState)("");
     const [activeTab, setActiveTab] = (0, import_react.useState)("settings");
@@ -23718,8 +23736,11 @@
     const [transcriptTimeMs, setTranscriptTimeMs] = (0, import_react.useState)(0);
     const [transcriptSearch, setTranscriptSearch] = (0, import_react.useState)("");
     const targetInputRef = (0, import_react.useRef)(null);
+    const secondaryInputRef = (0, import_react.useRef)(null);
     const targetBlurTimerRef = (0, import_react.useRef)(null);
+    const secondaryBlurTimerRef = (0, import_react.useRef)(null);
     const transcriptActiveRef = (0, import_react.useRef)(null);
+    const lastScrolledTranscriptEntryRef = (0, import_react.useRef)("");
     const latestDraftRef = (0, import_react.useRef)({
       customTargetDraft: "",
       metaPromptDraft: "",
@@ -23757,7 +23778,15 @@
       };
       const handleTranscript = (data) => {
         if (data && Array.isArray(data.entries)) {
-          setTranscriptEntries(data.entries);
+          const sortedEntries = [...data.entries].sort((a, b) => {
+            const aStart = Number(a == null ? void 0 : a.s);
+            const bStart = Number(b == null ? void 0 : b.s);
+            if (Number.isFinite(aStart) && Number.isFinite(bStart) && aStart !== bStart) {
+              return aStart - bStart;
+            }
+            return String((a == null ? void 0 : a.i) || "").localeCompare(String((b == null ? void 0 : b.i) || ""), void 0, { numeric: true });
+          });
+          setTranscriptEntries(sortedEntries);
         }
       };
       const handleTranscriptTime = (data) => {
@@ -23799,10 +23828,22 @@
       setMetaPromptDraft(String((settings == null ? void 0 : settings.llmMetaPrompt) || ""));
     }, [settings == null ? void 0 : settings.llmMetaPrompt]);
     (0, import_react.useEffect)(() => {
-      if (activeTab === "transcript" && transcriptActiveRef.current) {
-        transcriptActiveRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
-    }, [transcriptTimeMs, activeTab]);
+      var _a2, _b2;
+      if (activeTab !== "transcript") return;
+      const activeNode = transcriptActiveRef.current;
+      if (!activeNode) return;
+      const entryId = String(((_a2 = activeNode.dataset) == null ? void 0 : _a2.entryId) || "");
+      if (!entryId || lastScrolledTranscriptEntryRef.current === entryId) return;
+      lastScrolledTranscriptEntryRef.current = entryId;
+      const scrollParent = activeNode.parentElement;
+      const parentRect = (_b2 = scrollParent == null ? void 0 : scrollParent.getBoundingClientRect) == null ? void 0 : _b2.call(scrollParent);
+      const activeRect = activeNode.getBoundingClientRect();
+      const isOutOfView = parentRect ? activeRect.top < parentRect.top || activeRect.bottom > parentRect.bottom : true;
+      activeNode.scrollIntoView({
+        block: "nearest",
+        behavior: isOutOfView ? "smooth" : "auto"
+      });
+    }, [transcriptTimeMs, activeTab, transcriptEntries.length, transcriptSearch]);
     (0, import_react.useEffect)(() => {
       latestDraftRef.current = {
         customTargetDraft: String(customTargetDraft || ""),
@@ -23815,6 +23856,9 @@
       return () => {
         if (targetBlurTimerRef.current) {
           clearTimeout(targetBlurTimerRef.current);
+        }
+        if (secondaryBlurTimerRef.current) {
+          clearTimeout(secondaryBlurTimerRef.current);
         }
       };
     }, []);
@@ -23858,6 +23902,9 @@
       if (targetInputRef.current && document.activeElement === targetInputRef.current) return;
       setTargetInput(selectedTargetDisplay);
     }, [selectedTargetDisplay]);
+    (0, import_react.useEffect)(() => {
+      setSecondaryTargetInput(getLanguageDisplay(settings == null ? void 0 : settings.secondaryTargetLang, allLangOptions));
+    }, [allLangOptions, settings == null ? void 0 : settings.secondaryTargetLang]);
     const filteredTargetOptions = (0, import_react.useMemo)(() => {
       const query = String(targetInput || "").trim().toLowerCase();
       if (!query) return allLangOptions;
@@ -23866,9 +23913,21 @@
       });
     }, [allLangOptions, targetInput]);
     const visibleTargetOptions = (0, import_react.useMemo)(() => filteredTargetOptions.slice(0, 80), [filteredTargetOptions]);
+    const filteredSecondaryOptions = (0, import_react.useMemo)(() => {
+      const query = String(secondaryTargetInput || "").trim().toLowerCase();
+      if (!query) return allLangOptions;
+      return allLangOptions.filter((item) => {
+        return String(item.code || "").toLowerCase().includes(query) || String(item.rawLabel || "").toLowerCase().includes(query) || String(item.label || "").toLowerCase().includes(query);
+      });
+    }, [allLangOptions, secondaryTargetInput]);
+    const visibleSecondaryOptions = (0, import_react.useMemo)(() => filteredSecondaryOptions.slice(0, 80), [filteredSecondaryOptions]);
     const closeTargetMenu = () => {
       setTargetMenuOpen(false);
       setTargetActiveIndex(-1);
+    };
+    const closeSecondaryMenu = () => {
+      setSecondaryMenuOpen(false);
+      setSecondaryActiveIndex(-1);
     };
     if (!settings) {
       return /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-sidebar" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-loading-card" }, /* @__PURE__ */ import_react.default.createElement("h2", null, "Polyscript Beta"), /* @__PURE__ */ import_react.default.createElement("p", null, "Loading player settings..."), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn ps-btn-primary", type: "button", onClick: () => sendMessage("ps:getSettings", {}) }, "Refresh")));
@@ -23930,6 +23989,20 @@
         retranslate
       });
       closeTargetMenu();
+    };
+    const commitSecondaryTargetValue = (rawValue) => {
+      const next = String(rawValue || "").trim();
+      if (!next) {
+        setSecondaryTargetInput("");
+        updateSetting("secondaryTargetLang", "");
+        closeSecondaryMenu();
+        return;
+      }
+      const match = findMatchingTargetOption(allLangOptions, next);
+      const value = (match == null ? void 0 : match.kind) === "google" ? match.code : String((match == null ? void 0 : match.rawLabel) || next).trim();
+      setSecondaryTargetInput((match == null ? void 0 : match.rawLabel) || value);
+      updateSetting("secondaryTargetLang", value);
+      closeSecondaryMenu();
     };
     return /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-sidebar" }, /* @__PURE__ */ import_react.default.createElement("header", { className: "ps-header" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-header-row" }, /* @__PURE__ */ import_react.default.createElement("img", { src: LOGO_SRC, alt: "", className: "ps-header-logo" }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", null, "Polyscript Beta"), /* @__PURE__ */ import_react.default.createElement("p", null, "Dual subtitles and AI reading tools for faster comprehension.")))), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-tab-bar" }, /* @__PURE__ */ import_react.default.createElement(
       "button",
@@ -24059,6 +24132,82 @@
         }
       },
       entry.label
+    ))) : null), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-card-header" }, /* @__PURE__ */ import_react.default.createElement("label", null, "Secondary Subtitle"), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        className: "ps-btn ps-btn-compact",
+        type: "button",
+        onMouseDown: (e) => {
+          e.preventDefault();
+          if (secondaryBlurTimerRef.current) {
+            clearTimeout(secondaryBlurTimerRef.current);
+          }
+        },
+        onClick: () => commitSecondaryTargetValue("")
+      },
+      "Off"
+    )), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-lang-combo" }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: secondaryInputRef,
+        className: "ps-input",
+        value: secondaryTargetInput,
+        onChange: (e) => {
+          setSecondaryTargetInput(e.target.value);
+          setSecondaryMenuOpen(true);
+          setSecondaryActiveIndex(0);
+        },
+        onFocus: () => {
+          setSecondaryMenuOpen(true);
+          setSecondaryActiveIndex(0);
+        },
+        onBlur: () => {
+          secondaryBlurTimerRef.current = setTimeout(() => {
+            commitSecondaryTargetValue(secondaryTargetInput);
+          }, 120);
+        },
+        onKeyDown: (e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setSecondaryMenuOpen(true);
+            setSecondaryActiveIndex((index) => Math.min(index + 1, Math.max(visibleSecondaryOptions.length - 1, 0)));
+            return;
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setSecondaryActiveIndex((index) => Math.max(index - 1, 0));
+            return;
+          }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const activeOption = visibleSecondaryOptions[secondaryActiveIndex];
+            commitSecondaryTargetValue((activeOption == null ? void 0 : activeOption.rawLabel) || (activeOption == null ? void 0 : activeOption.code) || secondaryTargetInput);
+            return;
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setSecondaryTargetInput(getLanguageDisplay(settings == null ? void 0 : settings.secondaryTargetLang, allLangOptions));
+            closeSecondaryMenu();
+          }
+        },
+        placeholder: "Off, or choose another language..."
+      }
+    ), secondaryMenuOpen && visibleSecondaryOptions.length ? /* @__PURE__ */ import_react.default.createElement("ul", { className: "ps-lang-combo-list", role: "listbox" }, visibleSecondaryOptions.map((entry, index) => /* @__PURE__ */ import_react.default.createElement(
+      "li",
+      {
+        key: `secondary-${entry.optionValue}`,
+        className: `ps-lang-combo-item ${index === secondaryActiveIndex ? "is-active" : ""}`,
+        role: "option",
+        "aria-selected": index === secondaryActiveIndex,
+        onMouseDown: (e) => {
+          e.preventDefault();
+          if (secondaryBlurTimerRef.current) {
+            clearTimeout(secondaryBlurTimerRef.current);
+          }
+          commitSecondaryTargetValue(entry.rawLabel || entry.code);
+        }
+      },
+      entry.label
     ))) : null), /* @__PURE__ */ import_react.default.createElement("label", null, "Meta Prompt"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -24113,14 +24262,6 @@
         onToggle: () => updateSetting("segmentationEnabled", !settings.segmentationEnabled),
         hint: "G"
       }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      ToggleRow,
-      {
-        title: "Source Subtitles",
-        subtitle: "Show the source-language subtitle track alongside your target line",
-        enabled: settings.showSourceSubtitles === true,
-        onToggle: () => updateSetting("showSourceSubtitles", settings.showSourceSubtitles !== true)
-      }
     )), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Speech"), /* @__PURE__ */ import_react.default.createElement(
       ToggleRow,
       {
@@ -24169,27 +24310,18 @@
         enabled: !!settings.sentenceTtsOnPause,
         onToggle: () => updateSetting("sentenceTtsOnPause", !settings.sentenceTtsOnPause)
       }
-    )) : null), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Layout"), /* @__PURE__ */ import_react.default.createElement("label", null, "Overlay Dock"), /* @__PURE__ */ import_react.default.createElement(
+    )) : null), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Appearance"), /* @__PURE__ */ import_react.default.createElement("label", null, "Font Size"), /* @__PURE__ */ import_react.default.createElement(
       "select",
       {
         className: "ps-select",
-        value: ((_m = settings.appearance) == null ? void 0 : _m.overlayDock) || "bottom",
-        onChange: (e) => updateSetting("overlayDock", e.target.value)
-      },
-      /* @__PURE__ */ import_react.default.createElement("option", { value: "bottom" }, "Bottom"),
-      /* @__PURE__ */ import_react.default.createElement("option", { value: "top" }, "Top")
-    ), /* @__PURE__ */ import_react.default.createElement("label", null, "Font Size"), /* @__PURE__ */ import_react.default.createElement(
-      "select",
-      {
-        className: "ps-select",
-        value: ((_n = settings.appearance) == null ? void 0 : _n.fontSize) || "large",
+        value: ((_m = settings.appearance) == null ? void 0 : _m.fontSize) || "large",
         onChange: (e) => updateSetting("fontSize", e.target.value)
       },
       /* @__PURE__ */ import_react.default.createElement("option", { value: "small" }, "Small"),
       /* @__PURE__ */ import_react.default.createElement("option", { value: "medium" }, "Medium"),
       /* @__PURE__ */ import_react.default.createElement("option", { value: "large" }, "Large"),
       /* @__PURE__ */ import_react.default.createElement("option", { value: "xl" }, "Extra Large")
-    ), /* @__PURE__ */ import_react.default.createElement("label", null, "Background Opacity \u2014 ", Math.round(((_p = (_o = settings.appearance) == null ? void 0 : _o.bgOpacity) != null ? _p : 0.85) * 100), "%"), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement("label", null, "Background Opacity \u2014 ", Math.round(((_o = (_n = settings.appearance) == null ? void 0 : _n.bgOpacity) != null ? _o : 0.85) * 100), "%"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         className: "ps-input",
@@ -24197,18 +24329,9 @@
         min: "0",
         max: "1",
         step: "0.05",
-        value: (_r = (_q = settings.appearance) == null ? void 0 : _q.bgOpacity) != null ? _r : 0.85,
+        value: (_q = (_p = settings.appearance) == null ? void 0 : _p.bgOpacity) != null ? _q : 0.85,
         onChange: (e) => updateSetting("overlayBgOpacity", parseFloat(e.target.value))
       }
-    ), /* @__PURE__ */ import_react.default.createElement("label", null, "Auto Arrange"), /* @__PURE__ */ import_react.default.createElement(
-      "select",
-      {
-        className: "ps-select",
-        value: settings.autoArrangeSubs ? "on" : "off",
-        onChange: (e) => updateSetting("autoArrangeSubs", e.target.value === "on")
-      },
-      /* @__PURE__ */ import_react.default.createElement("option", { value: "on" }, "On"),
-      /* @__PURE__ */ import_react.default.createElement("option", { value: "off" }, "Off")
     ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions ps-actions-single" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn", type: "button", onClick: () => sendAction("restoreLayout") }, "Restore Layout")))) : null, activeTab === "transcript" ? /* @__PURE__ */ import_react.default.createElement(
       TranscriptPanel,
       {
