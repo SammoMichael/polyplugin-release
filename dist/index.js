@@ -190,6 +190,11 @@
   var sourceTrackAutoSelectedForFile = false;
   var sourceTrackSelectionAttempts = 0;
   var lastSourceTrackSelectionAttemptAt = 0;
+  var sourceTrackAutoSelectRetryTimer = null;
+  var primarySubtitleSelectionVerificationTimer = null;
+  var sourceTrackAutoProbeRetryTimer = null;
+  var sourceTrackAutoRejectedIds = /* @__PURE__ */ new Set();
+  var sourceTrackAutoProbePendingId = null;
   var lastSourceSubId = null;
   var lastMissingLoginOsdAt = 0;
   var lastSessionExpiredOsdAt = 0;
@@ -1799,10 +1804,25 @@
   }
   function setSecondarySubtitleTrack(id) {
     try {
+      const desiredId = id == null || id === "no" ? null : Number(id);
+      try {
+        if (core == null ? void 0 : core.subtitle) {
+          core.subtitle.secondID = Number.isFinite(desiredId) ? desiredId : null;
+        }
+      } catch {
+      }
+      try {
+        if (Number.isFinite(desiredId)) {
+          mpv.command("set", ["secondary-sid", String(desiredId)]);
+        } else {
+          mpv.command("set", ["secondary-sid", "no"]);
+        }
+      } catch {
+      }
       if (id == null || id === "no") {
         mpv.set("secondary-sid", "no");
       } else {
-        mpv.set("secondary-sid", id);
+        mpv.set("secondary-sid", Number.isFinite(desiredId) ? desiredId : id);
       }
       return true;
     } catch {
@@ -1811,7 +1831,7 @@
   }
   function pickSecondarySourceTrack(excludedTrackId = null) {
     const tracks = listSubtitleTracks().filter((track) => track.id !== excludedTrackId);
-    const candidate = pickBestSourceSubtitleTrack(tracks);
+    const candidate = pickBestSourceSubtitleTrack(tracks, void 0, { honorSelected: false });
     return candidate && typeof candidate.id === "number" ? candidate : null;
   }
   function syncSourceSubtitleTrack() {
@@ -1829,6 +1849,9 @@
       void ensureSourceSubtitleEntries().then((ok) => {
         if (ok && lastRenderedText) {
           scheduleRender(lastRenderedText);
+        }
+        if (ok && (subtitleEntries == null ? void 0 : subtitleEntries.length)) {
+          emitTranscriptEntries();
         }
       }).catch(() => {
       });
@@ -4127,7 +4150,7 @@ ws.onmessage = (event) => {
       clearSubtitleOverlay();
       try {
         if (lastNativeSubId != null) {
-          mpv.set("sid", lastNativeSubId);
+          setPrimarySubtitleTrack(lastNativeSubId);
         }
         mpv.set("secondary-sid", "no");
       } catch {
@@ -7601,6 +7624,49 @@ Only output the transformed text, nothing else.`,
       return null;
     }
   }
+  function isPrimarySubtitleTrackSelected(id) {
+    var _a5;
+    const desiredId = Number(id);
+    if (!Number.isFinite(desiredId)) return false;
+    try {
+      const coreSubtitleId = (_a5 = core == null ? void 0 : core.subtitle) == null ? void 0 : _a5.id;
+      if (Number(coreSubtitleId) === desiredId) return true;
+    } catch {
+    }
+    const selected = getSelectedSubTrack();
+    if (selected && Number(selected.id) === desiredId) return true;
+    try {
+      const sid = typeof mpv.getString === "function" ? mpv.getString("sid") : "";
+      return String(sid) === String(desiredId);
+    } catch {
+      return false;
+    }
+  }
+  function setPrimarySubtitleTrack(id) {
+    const desiredId = id == null || id === "no" ? null : Number(id);
+    try {
+      if (core == null ? void 0 : core.subtitle) {
+        core.subtitle.id = Number.isFinite(desiredId) ? desiredId : null;
+      }
+    } catch {
+    }
+    try {
+      if (Number.isFinite(desiredId)) {
+        mpv.command("set", ["sid", String(desiredId)]);
+      } else {
+        mpv.command("set", ["sid", "no"]);
+      }
+    } catch {
+    }
+    try {
+      if (Number.isFinite(desiredId)) {
+        mpv.set("sid", desiredId);
+      } else {
+        mpv.set("sid", "no");
+      }
+    } catch {
+    }
+  }
   function findSubtitleTrackByExternalPath(path) {
     const target = String(path || "").trim();
     if (!target) return null;
@@ -7632,6 +7698,73 @@ Only output the transformed text, nothing else.`,
       });
     } catch {
       return [];
+    }
+  }
+  var SUBTITLE_DEBUG_PATH = "/tmp/polyscript_subtitle_debug.jsonl";
+  var SUBTITLE_DEBUG_MAX_LINES = 240;
+  var SUBTITLE_DEBUG_BUILD_MARKER = "auto-select-confirmation-2026-05-01-a";
+  var SUBTITLE_DEBUG_ENABLED = false;
+  var subtitleDebugLines = [];
+  var subtitleDebugSequence = 0;
+  function sanitizeSubtitleTrackForDebug(track) {
+    if (!track || typeof track !== "object") return null;
+    return {
+      id: track.id,
+      type: track.type,
+      selected: !!track.selected,
+      default: !!track.default,
+      forced: !!track.forced,
+      title: String(track.title || ""),
+      lang: String(track.lang || track.language || ""),
+      external: !!(track["external-filename"] || track["external_filename"]),
+      codec: String(track.codec || ""),
+      dependent: !!track.dependent,
+      image: !!track.image
+    };
+  }
+  function writeSubtitleDebugSnapshot(reason, extra = {}) {
+    if (!SUBTITLE_DEBUG_ENABLED) return;
+    try {
+      const tracks = typeof mpv.getNative === "function" ? mpv.getNative("track-list") : [];
+      const snapshot = {
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        reason: String(reason || ""),
+        sid: typeof mpv.getString === "function" ? mpv.getString("sid") : null,
+        secondarySid: typeof mpv.getString === "function" ? mpv.getString("secondary-sid") : null,
+        coreSubtitleId: (() => {
+          var _a5, _b;
+          try {
+            return (_b = (_a5 = core == null ? void 0 : core.subtitle) == null ? void 0 : _a5.id) != null ? _b : null;
+          } catch {
+            return null;
+          }
+        })(),
+        subVisibility: safeGetBoolean("sub-visibility"),
+        secondarySubVisibility: safeGetBoolean("secondary-sub-visibility"),
+        selected: sanitizeSubtitleTrackForDebug(getSelectedSubTrack()),
+        tracks: Array.isArray(tracks) ? tracks.filter((track) => track && track.type === "sub").map(sanitizeSubtitleTrackForDebug) : [],
+        autoPickSourceSubtitlesEnabled,
+        sourceTrackAutoSelectedForFile,
+        sourceTrackSelectionAttempts,
+        lastSourceSubId,
+        usingNativeTargetSubs,
+        usingFullFileTranslation,
+        targetLang: getEffectiveTargetLang(),
+        debugBuildMarker: SUBTITLE_DEBUG_BUILD_MARKER,
+        ...extra
+      };
+      const line = JSON.stringify(snapshot);
+      subtitleDebugLines.push(line);
+      while (subtitleDebugLines.length > SUBTITLE_DEBUG_MAX_LINES) {
+        subtitleDebugLines.shift();
+      }
+      subtitleDebugSequence += 1;
+      const safeReason = String(reason || "snapshot").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
+      file.write(`/tmp/polyscript_subtitle_debug_${String(subtitleDebugSequence).padStart(3, "0")}_${safeReason}.json`, `${line}
+`);
+      console.log(`POLYSCRIPT: Subtitle debug snapshot ${reason} -> ${SUBTITLE_DEBUG_PATH}`);
+    } catch (error) {
+      console.log(`POLYSCRIPT-WARN: Subtitle debug snapshot failed: ${String((error == null ? void 0 : error.message) || error)}`);
     }
   }
   var NATIVE_SUBTITLE_LANG_ALIASES = {
@@ -7737,13 +7870,19 @@ Only output the transformed text, nothing else.`,
     }
     return null;
   }
-  function primeSubtitleEntriesForSelectedTrack(reason = "selected-track") {
+  function primeSubtitleEntriesForSelectedTrack(reason = "selected-track", options = {}) {
     clearSubtitleEntriesState();
     void ensureSentenceEntries().then((ok) => {
       if (!ok) {
         console.log(`POLYSCRIPT: No parsed subtitle entries available for ${reason}.`);
         syncNativeSubtitleVisibility();
+        if (options.autoSourceTrackId != null) {
+          handleAutoSourceTrackProbeFailure(options.autoSourceTrackId, reason);
+        }
         return;
+      }
+      if (options.autoSourceTrackId != null) {
+        confirmAutoSourceTrack(options.autoSourceTrackId);
       }
       maybeStartExactTimelineFullFileTranslation(reason);
       loadTranscriptFromCurrentSubs();
@@ -7752,40 +7891,94 @@ Only output the transformed text, nothing else.`,
     }).catch((error) => {
       console.log(`POLYSCRIPT-ERROR: Failed to prepare subtitle entries for ${reason}: ${String((error == null ? void 0 : error.message) || error)}`);
       syncNativeSubtitleVisibility();
+      if (options.autoSourceTrackId != null) {
+        handleAutoSourceTrackProbeFailure(options.autoSourceTrackId, reason);
+      }
     });
   }
   function tryUseNativeTargetSubtitles() {
-    var _a5;
-    if (!useNativeSubsWhenAvailable || !polyscriptEnabled) return false;
+    if (!useNativeSubsWhenAvailable || !polyscriptEnabled) {
+      writeSubtitleDebugSnapshot("try-native-target-disabled", {
+        useNativeSubsWhenAvailable,
+        polyscriptEnabled
+      });
+      return false;
+    }
     const effectiveTarget = getEffectiveTargetLang();
-    if (!effectiveTarget) return false;
-    const nativeTrack = findNativeTargetTrack(effectiveTarget);
+    if (!effectiveTarget) {
+      writeSubtitleDebugSnapshot("try-native-target-no-target");
+      return false;
+    }
+    writeSubtitleDebugSnapshot("try-native-target-start", {
+      effectiveTarget
+    });
+    let nativeTrack = null;
+    try {
+      nativeTrack = findNativeTargetTrack(effectiveTarget);
+    } catch (error) {
+      writeSubtitleDebugSnapshot("try-native-target-error", {
+        effectiveTarget,
+        error: String((error == null ? void 0 : error.message) || error)
+      });
+      console.log(`POLYSCRIPT-WARN: Native target subtitle probe failed for ${effectiveTarget}: ${String((error == null ? void 0 : error.message) || error)}`);
+      return false;
+    }
+    writeSubtitleDebugSnapshot("try-native-target", {
+      effectiveTarget,
+      nativeCandidate: sanitizeSubtitleTrackForDebug(nativeTrack)
+    });
     if (!nativeTrack || typeof nativeTrack.id !== "number") return false;
     const current = getSelectedSubTrack();
     if (current && current.id === nativeTrack.id && usingNativeTargetSubs) return true;
-    try {
-      mpv.set("sid", nativeTrack.id);
-      lastNativeSubId = nativeTrack.id;
-      usingFullFileTranslation = false;
-      usingNativeTargetSubs = true;
-      sourceTrackAutoSelectedForFile = true;
-      const sourceCandidate = pickSecondarySourceTrack(nativeTrack.id);
-      lastSourceSubId = (_a5 = sourceCandidate == null ? void 0 : sourceCandidate.id) != null ? _a5 : null;
-      primeSubtitleEntriesForSelectedTrack("native-target");
-      const label = String(nativeTrack.title || nativeTrack.lang || nativeTrack.language || nativeTrack.id);
-      core.osd(`POLYSCRIPT: Using native ${label} subtitles`, 2e3);
-      console.log(`POLYSCRIPT: Switched to native target-language subtitle track id=${nativeTrack.id} lang=${label}`);
-      return true;
-    } catch (e) {
-      console.log(`POLYSCRIPT-ERROR: Failed to switch to native target subtitle: ${e.message}`);
-      return false;
-    }
+    return requestPrimarySubtitleTrackSelection(
+      nativeTrack,
+      "native-target",
+      () => {
+        var _a5;
+        lastNativeSubId = nativeTrack.id;
+        usingFullFileTranslation = false;
+        usingNativeTargetSubs = true;
+        sourceTrackAutoSelectedForFile = true;
+        const sourceCandidate = pickSecondarySourceTrack(nativeTrack.id);
+        lastSourceSubId = (_a5 = sourceCandidate == null ? void 0 : sourceCandidate.id) != null ? _a5 : null;
+        primeSubtitleEntriesForSelectedTrack("native-target");
+        const label = String(nativeTrack.title || nativeTrack.lang || nativeTrack.language || nativeTrack.id);
+        core.osd(`POLYSCRIPT: Using native ${label} subtitles`, 2e3);
+        console.log(`POLYSCRIPT: Switched to native target-language subtitle track id=${nativeTrack.id} lang=${label}`);
+      },
+      () => {
+        console.log(`POLYSCRIPT-ERROR: Failed to verify native target subtitle selection id=${nativeTrack.id}`);
+        scheduleAutoSelectSourceSubtitleRetry("native-target-verify-failed");
+      }
+    );
   }
   var LANGUAGE_ROUTING_MATRIX = { "en": ["de", "nl", "no", "sv", "es", "fr", "da", "en"], "es": ["pt", "fr", "it", "en", "gl", "ca", "de"], "fr": ["es", "pt", "it", "en", "de", "ca", "ru"], "de": ["en", "nl", "no", "da", "sv", "ru", "fr"], "it": ["es", "fr", "pt", "en", "de", "ca", "ru"], "pt": ["es", "fr", "it", "en", "gl", "ca", "de"], "ru": ["uk", "pl", "en", "cs", "de", "es", "fr"], "ja": ["en", "de", "zh", "fr", "ko", "es", "ru"], "ko": ["en", "ja", "de", "zh", "ru", "es", "fr"], "zh": ["en", "de", "es", "ru", "fr", "ja", "pt"], "ar": ["he", "en", "es", "fr", "de", "ru", "it"], "hi": ["ur", "en", "de", "es", "ru", "fr", "pt"], "bn": ["en", "de", "ru", "fr", "es", "hi", "nl"], "tr": ["en", "de", "es", "fr", "ja", "ru", "he"], "pl": ["ru", "cs", "uk", "en", "de", "es", "fr"], "nl": ["de", "en", "no", "sv", "es", "da", "fr"], "sv": ["en", "de", "da", "no", "nl", "ru", "es"], "da": ["en", "de", "sv", "no", "nl", "ru", "fr"], "no": ["en", "de", "da", "sv", "nl", "ru", "es"], "fi": ["en", "es", "ru", "de", "fr", "pt", "it"], "cs": ["ru", "pl", "en", "uk", "de", "es", "fr"], "el": ["en", "es", "de", "ru", "fr", "it", "pt"], "he": ["en", "es", "fr", "de", "ru", "pt", "it"], "hu": ["fi", "en", "de", "es", "fr", "ru", "pt"], "ro": ["es", "fr", "it", "pt", "en", "de", "ru"], "th": ["en", "fr", "es", "de", "ru", "he", "pt"], "vi": ["en", "fr", "es", "de", "ru", "he", "pt"], "id": ["ms", "en", "fr", "es", "de", "ru", "he"], "ms": ["id", "en", "fr", "es", "de", "ru", "he"], "uk": ["ru", "pl", "en", "de", "cs", "fr", "es"], "bg": ["ru", "en", "pl", "uk", "es", "de", "cs"], "hr": ["ru", "en", "pl", "uk", "de", "es", "cs"], "sr": ["ru", "en", "pl", "uk", "de", "es", "cs"], "sk": ["ru", "cs", "pl", "en", "uk", "de", "es"], "sl": ["ru", "pl", "en", "uk", "cs", "de", "es"], "et": ["fi", "en", "es", "de", "ru", "fr", "pt"], "lv": ["ru", "en", "de", "pl", "uk", "fr", "cs"], "lt": ["ru", "en", "pl", "cs", "de", "uk", "es"], "ka": ["en", "de", "es", "fr", "ru", "nl", "pt"], "ur": ["hi", "en", "es", "de", "ru", "fr", "pt"], "ta": ["en", "de", "ja", "es", "fr", "ru", "zh"], "te": ["en", "de", "ja", "es", "fr", "ru", "zh"], "ml": ["en", "ja", "de", "zh", "ru", "fr", "es"], "kn": ["en", "ja", "de", "es", "fr", "ru", "zh"], "gu": ["hi", "en", "de", "es", "ru", "fr", "it"], "mr": ["en", "de", "fr", "hi", "ru", "es", "nl"], "pa": ["en", "de", "ru", "es", "fr", "hi", "pl"], "af": ["de", "en", "nl", "no", "fr", "sv", "da"], "ca": ["es", "pt", "fr", "it", "en", "gl", "de"], "eu": ["en", "es", "fr", "de", "ru", "he", "pt"], "gl": ["es", "pt", "fr", "it", "en", "ca", "de"], "la": ["it", "es", "pt", "fr", "en", "de", "ru"], "tl": ["en", "es", "fr", "ru", "ms", "de", "pt"], "iw": ["he", "en", "es", "fr", "de", "ru", "pt"], "jw": ["ms", "en", "id", "fr", "de", "es", "ru"], "lzh": ["zh", "ja", "ko", "en", "de", "es", "ru"] };
+  LANGUAGE_ROUTING_MATRIX.grc = ["es", "en", "la", "el", "it", "fr", "de"];
+  function getTrackLanguageHint(track) {
+    const direct = String((track == null ? void 0 : track.lang) || (track == null ? void 0 : track.language) || "").trim();
+    if (direct) return direct;
+    const title = String((track == null ? void 0 : track.title) || "").trim();
+    if (!title) return "";
+    const titleTokens = title.toLowerCase().split(/[^a-z\u00c0-\u024f\u0370-\u03ff]+/u).filter(Boolean);
+    const titleTokenSet = new Set(titleTokens);
+    for (const [code, name] of Object.entries(GOOGLE_TRANSLATE_LANGS)) {
+      const normalizedCode = normalizeBaseLang(code);
+      const normalizedName = String(name || "").toLowerCase();
+      if (titleTokenSet.has(String(code).toLowerCase()) || titleTokenSet.has(normalizedCode) || titleTokenSet.has(normalizedName)) {
+        return code;
+      }
+    }
+    return "";
+  }
+  function getRoutingTargetCode(targetLanguage) {
+    const normalized = normalizeSubtitleComparisonText(targetLanguage);
+    if (normalized === "ancient greek" || normalized === "grc") return "grc";
+    return normalizeBaseLang(targetLanguage);
+  }
   function getOptimalSourceLang(targetLanguage, availableLangs) {
     if (!availableLangs || availableLangs.length === 0) return { lang: null, reason: "no_captions" };
     if (!targetLanguage) return { lang: availableLangs[0], reason: "no_target" };
-    let targetCode = normalizeBaseLang(targetLanguage);
+    let targetCode = getRoutingTargetCode(targetLanguage);
     const idealSources = (LANGUAGE_ROUTING_MATRIX[targetCode] || ["en"]).slice();
     if (!idealSources.includes(targetCode)) {
       idealSources.unshift(targetCode);
@@ -7805,15 +7998,15 @@ Only output the transformed text, nothing else.`,
     if (enTrack) return { lang: enTrack, reason: "absolute_fallback_en" };
     return { lang: availableLangs[0], reason: "last_resort" };
   }
-  function pickBestSourceSubtitleTrack(tracks, targetLangOverride) {
+  function pickBestSourceSubtitleTrack(tracks, targetLangOverride, options = {}) {
     var _a5, _b;
     if (!Array.isArray(tracks) || !tracks.length) return null;
-    const availableLangs = tracks.map((t) => t.lang || t.language || "").filter(Boolean);
+    const availableLangs = tracks.map(getTrackLanguageHint).filter(Boolean);
     const effectiveTarget = targetLangOverride || getEffectiveTargetLang();
     const routing = availableLangs.length > 1 ? getOptimalSourceLang(effectiveTarget, availableLangs) : null;
     const scored = tracks.map((track) => {
       let score = 0;
-      if (track.selected) score += 1e4;
+      if (options.honorSelected !== false && track.selected) score += 1e4;
       if (track.default) score += 400;
       if (track["external-filename"] || track["external_filename"]) score += 120;
       const title = String(track.title || "").toLowerCase();
@@ -7824,7 +8017,7 @@ Only output the transformed text, nothing else.`,
         score -= 25;
       }
       if (routing && routing.lang) {
-        const trackLang = normalizeBaseLang(track.lang || track.language || "");
+        const trackLang = normalizeBaseLang(getTrackLanguageHint(track));
         const routedLang = normalizeBaseLang(routing.lang);
         if (trackLang && routedLang && trackLang === routedLang) {
           score += 500;
@@ -7838,42 +8031,247 @@ Only output the transformed text, nothing else.`,
     });
     if (routing) {
       const winner = (_a5 = scored[0]) == null ? void 0 : _a5.track;
-      const winnerLang = winner ? winner.lang || winner.language || "?" : "?";
+      const winnerLang = winner ? getTrackLanguageHint(winner) || "?" : "?";
       console.log(`POLYSCRIPT: Source language routing: target=${effectiveTarget}, optimal=${routing.lang} (${routing.reason}), selected=${winnerLang}`);
     }
     return ((_b = scored[0]) == null ? void 0 : _b.track) || null;
   }
-  function maybeAutoSelectSourceSubtitleTrack(reason = "unknown") {
-    if (!polyscriptEnabled) return false;
-    if (!isAutoSourceSubtitleSelectionEnabled()) return false;
-    if (tryUseNativeTargetSubtitles()) return true;
-    const selected = getSelectedSubTrack();
-    if (selected && typeof selected.id === "number") {
-      lastNativeSubId = selected.id;
+  var AUTO_SOURCE_TRACK_MAX_ATTEMPTS = 36;
+  var AUTO_SOURCE_TRACK_RETRY_MS = 900;
+  function clearAutoSelectSourceSubtitleRetry() {
+    if (sourceTrackAutoSelectRetryTimer) {
+      clearTimeout(sourceTrackAutoSelectRetryTimer);
+      sourceTrackAutoSelectRetryTimer = null;
+    }
+  }
+  function clearPrimarySubtitleSelectionVerification() {
+    if (primarySubtitleSelectionVerificationTimer) {
+      clearTimeout(primarySubtitleSelectionVerificationTimer);
+      primarySubtitleSelectionVerificationTimer = null;
+    }
+  }
+  function clearAutoSourceProbeRetry() {
+    if (sourceTrackAutoProbeRetryTimer) {
+      clearTimeout(sourceTrackAutoProbeRetryTimer);
+      sourceTrackAutoProbeRetryTimer = null;
+    }
+  }
+  function scheduleAutoSelectSourceSubtitleRetry(reason = "retry", delayMs = AUTO_SOURCE_TRACK_RETRY_MS) {
+    if (sourceTrackAutoSelectRetryTimer) return;
+    if (primarySubtitleSelectionVerificationTimer) return;
+    if (!polyscriptEnabled || !isAutoSourceSubtitleSelectionEnabled()) return;
+    if (getSelectedSubTrack()) return;
+    if (sourceTrackAutoSelectedForFile) return;
+    if (sourceTrackSelectionAttempts >= AUTO_SOURCE_TRACK_MAX_ATTEMPTS) return;
+    sourceTrackAutoSelectRetryTimer = setTimeout(() => {
+      sourceTrackAutoSelectRetryTimer = null;
+      if (!getSelectedSubTrack()) {
+        maybeAutoSelectSourceSubtitleTrack(reason);
+      }
+    }, delayMs);
+  }
+  function getAutoSelectableSourceTracks() {
+    return listSubtitleTracks().filter((track) => track && typeof track.id === "number" && !sourceTrackAutoRejectedIds.has(track.id));
+  }
+  function confirmAutoSourceTrack(trackId) {
+    if (typeof trackId === "number") {
+      lastNativeSubId = trackId;
+      lastSourceSubId = trackId;
+    }
+    sourceTrackAutoProbePendingId = null;
+    clearAutoSelectSourceSubtitleRetry();
+    clearAutoSourceProbeRetry();
+    sourceTrackAutoSelectedForFile = true;
+  }
+  function handleAutoSourceTrackProbeFailure(trackId, reason = "auto-source") {
+    if (typeof trackId === "number") {
+      sourceTrackAutoRejectedIds.add(trackId);
+    }
+    sourceTrackAutoProbePendingId = null;
+    clearSubtitleEntriesState();
+    sourceTrackAutoSelectedForFile = false;
+    const remaining = getAutoSelectableSourceTracks();
+    if (!remaining.length) {
       sourceTrackAutoSelectedForFile = true;
+      console.log(`POLYSCRIPT-WARN: No usable subtitle source track found after trying ${sourceTrackAutoRejectedIds.size} tracks.`);
+      core.osd("POLYSCRIPT: No usable subtitle track found", 2200);
+      return;
+    }
+    setPrimarySubtitleTrack("no");
+    sourceTrackAutoProbeRetryTimer = setTimeout(() => {
+      sourceTrackAutoProbeRetryTimer = null;
+      maybeAutoSelectSourceSubtitleTrack(`${reason}-next-track`);
+    }, 250);
+  }
+  function requestPrimarySubtitleTrackSelection(track, reason, onConfirmed, onRejected) {
+    if (!track || typeof track.id !== "number") return false;
+    clearPrimarySubtitleSelectionVerification();
+    try {
+      writeSubtitleDebugSnapshot(`${reason}-set-before`, {
+        candidate: sanitizeSubtitleTrackForDebug(track)
+      });
+      safeSetBoolean("sub-visibility", true);
+      setPrimarySubtitleTrack(track.id);
+      const immediateSelected = isPrimarySubtitleTrackSelected(track.id);
+      writeSubtitleDebugSnapshot(`${reason}-set-immediate`, {
+        candidate: sanitizeSubtitleTrackForDebug(track),
+        immediateSelected
+      });
+      if (immediateSelected) {
+        onConfirmed == null ? void 0 : onConfirmed(track, "immediate");
+        return true;
+      }
+      primarySubtitleSelectionVerificationTimer = setTimeout(() => {
+        primarySubtitleSelectionVerificationTimer = null;
+        const confirmed = isPrimarySubtitleTrackSelected(track.id);
+        writeSubtitleDebugSnapshot(`${reason}-set-verified`, {
+          candidate: sanitizeSubtitleTrackForDebug(track),
+          confirmed
+        });
+        if (confirmed) {
+          onConfirmed == null ? void 0 : onConfirmed(track, "verified");
+        } else {
+          onRejected == null ? void 0 : onRejected(track);
+        }
+      }, 300);
+      return true;
+    } catch (error) {
+      writeSubtitleDebugSnapshot(`${reason}-set-error`, {
+        candidate: sanitizeSubtitleTrackForDebug(track),
+        error: String((error == null ? void 0 : error.message) || error)
+      });
+      onRejected == null ? void 0 : onRejected(track);
       return false;
     }
-    if (sourceTrackAutoSelectedForFile) return false;
-    if (sourceTrackSelectionAttempts >= 8) return false;
+  }
+  function maybeAutoSelectSourceSubtitleTrack(reason = "unknown") {
+    try {
+      return maybeAutoSelectSourceSubtitleTrackUnsafe(reason);
+    } catch (error) {
+      writeSubtitleDebugSnapshot(`auto-select-fatal:${reason}`, {
+        error: String((error == null ? void 0 : error.message) || error),
+        stack: String((error == null ? void 0 : error.stack) || "")
+      });
+      console.log(`POLYSCRIPT-ERROR: Auto-select subtitle track crashed: ${String((error == null ? void 0 : error.message) || error)}`);
+      scheduleAutoSelectSourceSubtitleRetry(`${reason}-fatal`);
+      return false;
+    }
+  }
+  function maybeAutoSelectSourceSubtitleTrackUnsafe(reason = "unknown") {
+    if (!polyscriptEnabled) {
+      writeSubtitleDebugSnapshot(`auto-select-disabled:${reason}`, { polyscriptEnabled });
+      return false;
+    }
+    if (!isAutoSourceSubtitleSelectionEnabled()) {
+      writeSubtitleDebugSnapshot(`auto-select-disabled:${reason}`, { autoPickSourceSubtitlesEnabled });
+      return false;
+    }
+    writeSubtitleDebugSnapshot(`auto-select-start:${reason}`);
+    try {
+      if (tryUseNativeTargetSubtitles()) return true;
+    } catch (error) {
+      writeSubtitleDebugSnapshot(`auto-select-native-error:${reason}`, {
+        error: String((error == null ? void 0 : error.message) || error)
+      });
+      console.log(`POLYSCRIPT-WARN: Native subtitle probing failed; falling back to source auto-select: ${String((error == null ? void 0 : error.message) || error)}`);
+    }
+    writeSubtitleDebugSnapshot(`auto-select-after-native:${reason}`);
+    const selected = getSelectedSubTrack();
+    if (selected && typeof selected.id === "number") {
+      if (sourceTrackAutoProbePendingId === selected.id) {
+        writeSubtitleDebugSnapshot(`auto-select-probe-pending:${reason}`, {
+          selected: sanitizeSubtitleTrackForDebug(selected)
+        });
+        return false;
+      }
+      const preferredTrack = pickBestSourceSubtitleTrack(getAutoSelectableSourceTracks(), void 0, { honorSelected: false });
+      if (preferredTrack && preferredTrack.id !== selected.id) {
+        console.log(`POLYSCRIPT: Switching source subtitle from track ${selected.id} to preferred track ${preferredTrack.id}.`);
+      } else {
+        writeSubtitleDebugSnapshot(`auto-select-existing:${reason}`, {
+          selected: sanitizeSubtitleTrackForDebug(selected)
+        });
+        clearAutoSelectSourceSubtitleRetry();
+        lastNativeSubId = selected.id;
+        sourceTrackAutoSelectedForFile = true;
+        return false;
+      }
+    }
+    if (sourceTrackAutoSelectedForFile) {
+      writeSubtitleDebugSnapshot(`auto-select-already-done:${reason}`);
+      return false;
+    }
+    if (sourceTrackSelectionAttempts >= AUTO_SOURCE_TRACK_MAX_ATTEMPTS) {
+      writeSubtitleDebugSnapshot(`auto-select-max-attempts:${reason}`);
+      return false;
+    }
     const now = Date.now();
-    if (now - lastSourceTrackSelectionAttemptAt < 900) return false;
+    writeSubtitleDebugSnapshot(`auto-select-before-attempt:${reason}`, {
+      lastSourceTrackSelectionAttemptAt,
+      sinceLastAttemptMs: now - lastSourceTrackSelectionAttemptAt
+    });
+    if (now - lastSourceTrackSelectionAttemptAt < AUTO_SOURCE_TRACK_RETRY_MS) {
+      writeSubtitleDebugSnapshot(`auto-select-cooldown:${reason}`, {
+        lastSourceTrackSelectionAttemptAt,
+        sinceLastAttemptMs: now - lastSourceTrackSelectionAttemptAt
+      });
+      scheduleAutoSelectSourceSubtitleRetry(`${reason}-cooldown`);
+      return false;
+    }
     lastSourceTrackSelectionAttemptAt = now;
     sourceTrackSelectionAttempts += 1;
-    const tracks = listSubtitleTracks();
-    if (!tracks.length) return false;
-    const candidate = pickBestSourceSubtitleTrack(tracks);
-    if (!candidate || typeof candidate.id !== "number") return false;
+    const tracks = getAutoSelectableSourceTracks();
+    if (!tracks.length) {
+      writeSubtitleDebugSnapshot(`auto-select-no-tracks:${reason}`);
+      if (sourceTrackAutoRejectedIds.size > 0) {
+        sourceTrackAutoSelectedForFile = true;
+        core.osd("POLYSCRIPT: No usable subtitle track found", 2200);
+      } else {
+        scheduleAutoSelectSourceSubtitleRetry(`${reason}-tracks-pending`);
+      }
+      return false;
+    }
+    const candidate = pickBestSourceSubtitleTrack(tracks, void 0, { honorSelected: false });
+    if (!candidate || typeof candidate.id !== "number") {
+      writeSubtitleDebugSnapshot(`auto-select-no-candidate:${reason}`, {
+        filteredTracks: tracks.map(sanitizeSubtitleTrackForDebug)
+      });
+      scheduleAutoSelectSourceSubtitleRetry(`${reason}-no-candidate`);
+      return false;
+    }
     try {
-      mpv.set("sid", candidate.id);
-      lastNativeSubId = candidate.id;
-      lastSourceSubId = candidate.id;
-      sourceTrackAutoSelectedForFile = true;
-      const label = String(candidate.title || candidate.lang || candidate.language || candidate.id);
-      core.osd(`POLYSCRIPT: Using subtitles (${label})`, 1400);
-      console.log(`POLYSCRIPT: Auto-selected source subtitle track id=${candidate.id} reason=${reason}`);
-      return true;
+      writeSubtitleDebugSnapshot(`auto-select-candidate:${reason}`, {
+        candidate: sanitizeSubtitleTrackForDebug(candidate),
+        filteredTracks: tracks.map(sanitizeSubtitleTrackForDebug)
+      });
+      return requestPrimarySubtitleTrackSelection(
+        candidate,
+        `auto-select:${reason}`,
+        (confirmedTrack, confirmationMode) => {
+          clearAutoSelectSourceSubtitleRetry();
+          lastNativeSubId = confirmedTrack.id;
+          lastSourceSubId = confirmedTrack.id;
+          sourceTrackAutoProbePendingId = confirmedTrack.id;
+          const label = String(confirmedTrack.title || confirmedTrack.lang || confirmedTrack.language || confirmedTrack.id);
+          core.osd(`POLYSCRIPT: Trying subtitles (${label})`, 1200);
+          console.log(`POLYSCRIPT: Trying source subtitle track id=${confirmedTrack.id} reason=${reason} mode=${confirmationMode}`);
+          writeSubtitleDebugSnapshot(`auto-select-applied:${reason}`, {
+            candidate: sanitizeSubtitleTrackForDebug(confirmedTrack),
+            confirmationMode
+          });
+          primeSubtitleEntriesForSelectedTrack("auto-source", { autoSourceTrackId: confirmedTrack.id });
+        },
+        (rejectedTrack) => {
+          console.log(`POLYSCRIPT-WARN: Auto-select subtitle track did not stick id=${rejectedTrack.id} reason=${reason}`);
+          writeSubtitleDebugSnapshot(`auto-select-rejected:${reason}`, {
+            candidate: sanitizeSubtitleTrackForDebug(rejectedTrack)
+          });
+          scheduleAutoSelectSourceSubtitleRetry(`${reason}-verify-failed`);
+        }
+      );
     } catch (e) {
       console.log(`POLYSCRIPT-ERROR: Auto-select subtitle track failed: ${e.message}`);
+      scheduleAutoSelectSourceSubtitleRetry(`${reason}-set-failed`);
       return false;
     }
   }
@@ -8251,7 +8649,7 @@ ${e.content}
     if (!selectedTrack || typeof selectedTrack.id !== "number") {
       throw new Error("Prepared translated subtitle track was not added to mpv.");
     }
-    mpv.set("sid", selectedTrack.id);
+    setPrimarySubtitleTrack(selectedTrack.id);
     lastTranslatedSubPath = outPath;
     usingFullFileTranslation = true;
     usingNativeTargetSubs = false;
@@ -8384,9 +8782,19 @@ ${e.content}
     if (cached && String(cached).trim()) return String(cached);
     return sourceText;
   }
+  function getEntryPrimaryTranscriptText(entry) {
+    if (!entry || typeof entry !== "object") return "";
+    if (usingNativeTargetSubs || usingFullFileTranslation || !hasExactSubtitleTimeline()) {
+      return getEntryDisplayText(entry);
+    }
+    const sourceText = String(entry.sourceContent || entry.content || "");
+    const translatedText = String(entry.translatedContent || "").trim();
+    if (translatedText) return translatedText;
+    const cached = String(lineTranslationCache.get(sourceText) || "").trim();
+    return cached;
+  }
   function hasAnyTranslatedTimelineEntries() {
     if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
-    if (hasExactSubtitleTimeline() && !usingFullFileTranslation && !usingNativeTargetSubs) return false;
     if (usingFullFileTranslation || usingNativeTargetSubs) return true;
     return subtitleEntries.some((entry) => {
       const translated = String((entry == null ? void 0 : entry.translatedContent) || "").trim();
@@ -8401,22 +8809,111 @@ ${e.content}
     const seen = /* @__PURE__ */ new Set();
     const deduped = [];
     rows.forEach((row) => {
-      const key = JSON.stringify([
+      if (isNearDuplicateTranscriptRow(row, deduped)) return;
+      const exactKey = JSON.stringify([
         Number(row == null ? void 0 : row.s),
         Number(row == null ? void 0 : row.e),
         String((row == null ? void 0 : row.t) || ""),
         String((row == null ? void 0 : row.src) || "")
       ]);
-      if (seen.has(key)) return;
-      seen.add(key);
+      const start = Number(row == null ? void 0 : row.s);
+      const displayKey = JSON.stringify([
+        Number.isFinite(start) ? Math.floor(start / 1e3) : "",
+        normalizeTranscriptRowText(row == null ? void 0 : row.t),
+        normalizeTranscriptRowText(row == null ? void 0 : row.src)
+      ]);
+      if (seen.has(exactKey) || seen.has(displayKey)) return;
+      seen.add(exactKey);
+      seen.add(displayKey);
       deduped.push(row);
     });
     return deduped;
   }
+  function normalizeTranscriptRowText(value) {
+    return normalizeSubtitleComparisonText(value);
+  }
+  function isNearDuplicateTranscriptRow(row, previousRows) {
+    const text = normalizeTranscriptRowText((row == null ? void 0 : row.t) || (row == null ? void 0 : row.src));
+    if (!text || !Array.isArray(previousRows) || !previousRows.length) return false;
+    const start = Number(row == null ? void 0 : row.s);
+    const end = Number(row == null ? void 0 : row.e);
+    const source = normalizeTranscriptRowText(row == null ? void 0 : row.src);
+    const NEAR_DUPLICATE_WINDOW_MS = 3200;
+    for (let i = previousRows.length - 1; i >= 0; i -= 1) {
+      const previous = previousRows[i];
+      const previousText = normalizeTranscriptRowText((previous == null ? void 0 : previous.t) || (previous == null ? void 0 : previous.src));
+      if (!previousText) continue;
+      const previousStart = Number(previous == null ? void 0 : previous.s);
+      if (Number.isFinite(start) && Number.isFinite(previousStart) && start - previousStart > NEAR_DUPLICATE_WINDOW_MS) {
+        break;
+      }
+      if (previousText !== text) continue;
+      const previousEnd = Number(previous == null ? void 0 : previous.e);
+      const startsClose = Number.isFinite(start) && Number.isFinite(previousStart) ? Math.abs(start - previousStart) <= NEAR_DUPLICATE_WINDOW_MS : false;
+      const overlapsPrevious = Number.isFinite(start) && Number.isFinite(previousEnd) ? start <= previousEnd + NEAR_DUPLICATE_WINDOW_MS : false;
+      if (startsClose || overlapsPrevious) {
+        if (source && !normalizeTranscriptRowText(previous.src)) {
+          previous.src = row.src;
+        }
+        if (Number.isFinite(end)) {
+          previous.e = Number.isFinite(previousEnd) ? Math.max(previousEnd, end) : end;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+  function entryTimesOverlap(a, b) {
+    const aStart = Number(a == null ? void 0 : a.startMs);
+    const aEnd = Number(a == null ? void 0 : a.endMs);
+    const bStart = Number(b == null ? void 0 : b.startMs);
+    const bEnd = Number(b == null ? void 0 : b.endMs);
+    if (![aStart, aEnd, bStart, bEnd].every(Number.isFinite)) return false;
+    return aStart <= bEnd && bStart <= aEnd;
+  }
+  function getTranscriptSourceTextForEntry(entry, index) {
+    var _a5;
+    const directSource = String((entry == null ? void 0 : entry.sourceContent) || "").trim();
+    const targetText = String((entry == null ? void 0 : entry.content) || "").trim();
+    if (directSource && normalizeSubtitleComparisonText(directSource) !== normalizeSubtitleComparisonText(targetText)) {
+      return directSource;
+    }
+    if (!Array.isArray(sourceSubtitleEntries) || !sourceSubtitleEntries.length) {
+      return directSource || targetText;
+    }
+    const indexed = sourceSubtitleEntries[index];
+    if ((indexed == null ? void 0 : indexed.content) && (!hasTimedSubtitleEntry(entry) || entryTimesOverlap(entry, indexed))) {
+      return String(indexed.content || "").trim();
+    }
+    if (hasTimedSubtitleEntry(entry)) {
+      const start = Number(entry.startMs);
+      const end = Number(entry.endMs);
+      const probe = Number.isFinite(start) && Number.isFinite(end) ? start + Math.max(0, Math.min(500, (end - start) / 2)) : start;
+      const match = findEntryAtTime(sourceSubtitleEntries, probe, Math.max(0, Number(index) - 2));
+      if ((_a5 = match == null ? void 0 : match.entry) == null ? void 0 : _a5.content) {
+        return String(match.entry.content || "").trim();
+      }
+    }
+    return String((indexed == null ? void 0 : indexed.content) || directSource || targetText || "").trim();
+  }
+  function getTranscriptSecondaryTextForEntry(entry, index, primaryText) {
+    const sourceText = getTranscriptSourceTextForEntry(entry, index);
+    const cachedSecondary = getCachedSecondarySubtitleText(sourceText, primaryText);
+    if (cachedSecondary) return cachedSecondary;
+    return getDistinctSecondarySubtitleText(sourceText, primaryText);
+  }
+  function transcriptRowsHaveSecondary(rows) {
+    if (!Array.isArray(rows)) return false;
+    return rows.some((row) => {
+      const primary = String((row == null ? void 0 : row.t) || "").trim();
+      const secondary = String((row == null ? void 0 : row.src) || "").trim();
+      return primary && secondary && normalizeTranscriptRowText(primary) !== normalizeTranscriptRowText(secondary);
+    });
+  }
   function emitTranscriptEntries() {
     if (!subtitleEntries || !subtitleEntries.length) return;
     if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
-      sendSidebarMessage("ps:transcript", { entries: [] });
+      sendSidebarMessage("ps:transcript", { entries: [], hasSecondary: false });
       return;
     }
     const sortedEntries = [...subtitleEntries].sort((a, b) => {
@@ -8427,14 +8924,20 @@ ${e.content}
       }
       return String((a == null ? void 0 : a.index) || "").localeCompare(String((b == null ? void 0 : b.index) || ""), void 0, { numeric: true });
     });
-    const lightweight = dedupeTranscriptRows(sortedEntries.map((e, i) => ({
-      i,
-      s: e.startMs,
-      e: e.endMs,
-      t: getEntryDisplayText(e),
-      src: String(e.sourceContent || e.content || "")
-    })));
-    sendSidebarMessage("ps:transcript", { entries: lightweight });
+    const lightweight = dedupeTranscriptRows(sortedEntries.map((e, i) => {
+      const primaryText = getEntryPrimaryTranscriptText(e);
+      return {
+        i,
+        s: e.startMs,
+        e: e.endMs,
+        t: primaryText,
+        src: getTranscriptSecondaryTextForEntry(e, i, primaryText)
+      };
+    }).filter((entry) => String(entry.t || "").trim()));
+    sendSidebarMessage("ps:transcript", {
+      entries: lightweight,
+      hasSecondary: transcriptRowsHaveSecondary(lightweight)
+    });
   }
   function emitLiveTranscriptEntries() {
     if (!liveTranscriptEntries.length) return;
@@ -8442,7 +8945,10 @@ ${e.content}
       ...e,
       t: transcriptTextForLine(e.src || e.t)
     }));
-    sendSidebarMessage("ps:transcript", { entries: mapped });
+    sendSidebarMessage("ps:transcript", {
+      entries: mapped,
+      hasSecondary: transcriptRowsHaveSecondary(mapped)
+    });
   }
   function emitTranscriptTimePos() {
     try {
@@ -8515,7 +9021,7 @@ ${e.content}
           maybeStartExactTimelineFullFileTranslation("transcript-load");
         }
         if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
-          sendSidebarMessage("ps:transcript", { entries: [] });
+          sendSidebarMessage("ps:transcript", { entries: [], hasSecondary: false });
         } else {
           emitTranscriptEntries();
         }
@@ -8527,13 +9033,16 @@ ${e.content}
             maybeStartExactTimelineFullFileTranslation("transcript-load");
           }
           if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
-            sendSidebarMessage("ps:transcript", { entries: [] });
+            sendSidebarMessage("ps:transcript", { entries: [], hasSecondary: false });
           } else {
             emitTranscriptEntries();
           }
         } else {
           if (liveTranscriptEntries.length) {
-            sendSidebarMessage("ps:transcript", { entries: liveTranscriptEntries });
+            sendSidebarMessage("ps:transcript", {
+              entries: liveTranscriptEntries,
+              hasSecondary: transcriptRowsHaveSecondary(liveTranscriptEntries)
+            });
           }
           console.log("POLYSCRIPT: No subtitle entries for transcript (no SRT found or ffmpeg unavailable).");
         }
@@ -8575,6 +9084,11 @@ ${e.content}
     sourceTrackAutoSelectedForFile = false;
     sourceTrackSelectionAttempts = 0;
     lastSourceTrackSelectionAttemptAt = 0;
+    sourceTrackAutoRejectedIds = /* @__PURE__ */ new Set();
+    sourceTrackAutoProbePendingId = null;
+    clearAutoSelectSourceSubtitleRetry();
+    clearPrimarySubtitleSelectionVerification();
+    clearAutoSourceProbeRetry();
     clearSentenceAutoResume();
     currentTranslateJobId += 1;
     subFirstShownAt = 0;

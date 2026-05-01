@@ -23587,7 +23587,6 @@
 
   // ui/sidebar/app.jsx
   var import_react = __toESM(require_react());
-  var LOGO_SRC = "data:image/png;base64,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";
   function sendMessage(name, data) {
     var _a, _b, _c;
     if ((_a = window.iina) == null ? void 0 : _a.postMessage) {
@@ -23597,16 +23596,17 @@
     }
   }
   function ToggleRow({ title, subtitle, enabled, onToggle, hint }) {
-    return /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-row" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-copy" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-title" }, title), subtitle ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-subtitle" }, subtitle) : null), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-actions" }, hint ? /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-key-hint" }, hint) : null, /* @__PURE__ */ import_react.default.createElement(
+    return /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        className: `ps-toggle-btn ${enabled ? "is-on" : "is-off"}`,
+        className: `ps-toggle-row ${enabled ? "is-on" : "is-off"}`,
         type: "button",
         onClick: onToggle,
         "aria-pressed": enabled
       },
-      enabled ? "On" : "Off"
-    )));
+      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-toggle-switch", "aria-hidden": "true" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-toggle-thumb" })),
+      /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-copy" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-title" }, title, hint ? /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-key-hint" }, hint) : null), subtitle ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-toggle-subtitle" }, subtitle) : null)
+    );
   }
   function formatTime(ms) {
     if (ms == null || ms < 0) return "0:00";
@@ -23631,16 +23631,60 @@
     }
     return -1;
   }
-  function TranscriptPanel({ entries, timeMs, search, onSearchChange, activeRef, showOriginal, onToggleOriginal }) {
-    const query = (search || "").trim().toLowerCase();
-    const hasDistinctOriginal = entries.some((entry) => {
+  function transcriptEntriesHaveSecondary(entries) {
+    if (!Array.isArray(entries)) return false;
+    return entries.some((entry) => {
       const src = String((entry == null ? void 0 : entry.src) || "").trim();
       const translated = String((entry == null ? void 0 : entry.t) || "").trim();
       return src && translated && src !== translated;
     });
+  }
+  function normalizeTranscriptEntryText(value) {
+    return String(value || "").replace(/\\n|\\N/g, "\n").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+  function dedupeTranscriptEntriesForDisplay(entries) {
+    if (!Array.isArray(entries) || entries.length <= 1) return Array.isArray(entries) ? entries : [];
+    const deduped = [];
+    const nearDuplicateWindowMs = 3200;
+    entries.forEach((entry) => {
+      const text = normalizeTranscriptEntryText((entry == null ? void 0 : entry.t) || (entry == null ? void 0 : entry.src));
+      const start = Number(entry == null ? void 0 : entry.s);
+      let duplicateIndex = -1;
+      for (let i = deduped.length - 1; i >= 0; i -= 1) {
+        const previous = deduped[i];
+        const previousText = normalizeTranscriptEntryText((previous == null ? void 0 : previous.t) || (previous == null ? void 0 : previous.src));
+        const previousStart = Number(previous == null ? void 0 : previous.s);
+        if (Number.isFinite(start) && Number.isFinite(previousStart) && start - previousStart > nearDuplicateWindowMs) {
+          break;
+        }
+        if (text && previousText === text) {
+          duplicateIndex = i;
+          break;
+        }
+      }
+      if (duplicateIndex >= 0) {
+        const previous = deduped[duplicateIndex];
+        const previousEnd = Number(previous == null ? void 0 : previous.e);
+        const end = Number(entry == null ? void 0 : entry.e);
+        if (Number.isFinite(end)) {
+          previous.e = Number.isFinite(previousEnd) ? Math.max(previousEnd, end) : end;
+        }
+        if (!String(previous.src || "").trim() && String((entry == null ? void 0 : entry.src) || "").trim()) {
+          previous.src = entry.src;
+        }
+        return;
+      }
+      deduped.push({ ...entry });
+    });
+    return deduped;
+  }
+  function TranscriptPanel({ entries, timeMs, search, onSearchChange, activeRef, hasSecondary, showOriginal, onToggleOriginal }) {
+    const query = (search || "").trim().toLowerCase();
+    const canShowSecondary = !!hasSecondary;
+    const showSecondary = showOriginal && canShowSecondary;
     const filtered = query ? entries.filter((e) => {
       const translated = String((e == null ? void 0 : e.t) || "").toLowerCase();
-      const original = String((e == null ? void 0 : e.src) || "").toLowerCase();
+      const original = showSecondary ? String((e == null ? void 0 : e.src) || "").toLowerCase() : "";
       return translated.includes(query) || original.includes(query);
     }) : entries;
     const activeIdx = query ? -1 : findActiveTranscriptIndex(filtered, timeMs);
@@ -23662,15 +23706,16 @@
         value: search,
         onChange: (e) => onSearchChange(e.target.value)
       }
-    )), hasDistinctOriginal ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-display-row", role: "group", "aria-label": "Transcript display controls" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-display-label" }, "Display"), /* @__PURE__ */ import_react.default.createElement(
+    )), canShowSecondary ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-display-row", role: "group", "aria-label": "Transcript display controls" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-display-label" }, "Transcript"), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        className: `ps-transcript-switch ${showOriginal ? "is-on" : ""}`,
+        className: `ps-transcript-switch ${showSecondary ? "active" : ""}`,
         type: "button",
         onClick: onToggleOriginal,
-        "aria-pressed": showOriginal
+        "aria-pressed": showSecondary,
+        "aria-label": showSecondary ? "Show primary and secondary transcript lines" : "Show primary transcript lines only"
       },
-      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-track" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-thumb" })),
+      /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-control", "aria-hidden": "true" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-track" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-thumb" }))),
       /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-switch-label" }, "Show Secondary")
     )) : null, query && filtered.length < entries.length ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-filter-info" }, /* @__PURE__ */ import_react.default.createElement("span", null, "Showing ", filtered.length, " matches"), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-transcript-clear-btn", type: "button", onClick: () => onSearchChange("") }, "Clear")) : null, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-list" }, filtered.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-title" }, entries.length === 0 ? "No transcript yet" : "No matches"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-transcript-empty-body" }, entries.length === 0 ? "Play a video with subtitles to see the transcript here." : "Try a different search term.")) : filtered.map((entry, i) => {
       const isActive = i === activeIdx;
@@ -23691,7 +23736,7 @@
           },
           formatTime(entry.s)
         ),
-        /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-copy", onClick: () => sendMessage("ps:transcriptSeek", { time: entry.s }) }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-text" }, entry.t), showOriginal && entry.src && entry.src !== entry.t ? /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-original" }, entry.src) : null)
+        /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-copy", onClick: () => sendMessage("ps:transcriptSeek", { time: entry.s }) }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-text" }, entry.t), showSecondary && entry.src && entry.src !== entry.t ? /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-transcript-original" }, entry.src) : null)
       );
     })));
   }
@@ -23733,6 +23778,7 @@
     const [metaPromptDraft, setMetaPromptDraft] = (0, import_react.useState)("");
     const [activeTab, setActiveTab] = (0, import_react.useState)("settings");
     const [transcriptEntries, setTranscriptEntries] = (0, import_react.useState)([]);
+    const [transcriptHasSecondary, setTranscriptHasSecondary] = (0, import_react.useState)(false);
     const [transcriptTimeMs, setTranscriptTimeMs] = (0, import_react.useState)(0);
     const [transcriptSearch, setTranscriptSearch] = (0, import_react.useState)("");
     const targetInputRef = (0, import_react.useRef)(null);
@@ -23786,7 +23832,12 @@
             }
             return String((a == null ? void 0 : a.i) || "").localeCompare(String((b == null ? void 0 : b.i) || ""), void 0, { numeric: true });
           });
-          setTranscriptEntries(sortedEntries);
+          const dedupedEntries = dedupeTranscriptEntriesForDisplay(sortedEntries);
+          const dedupedHasSecondary = transcriptEntriesHaveSecondary(dedupedEntries);
+          setTranscriptEntries(dedupedEntries);
+          setTranscriptHasSecondary(
+            typeof data.hasSecondary === "boolean" ? data.hasSecondary && dedupedHasSecondary : dedupedHasSecondary
+          );
         }
       };
       const handleTranscriptTime = (data) => {
@@ -23940,14 +23991,11 @@
     const aiLabel = String(aiStatus.label || "");
     const aiStatusTitle = aiState === "ready" ? "Ready" : aiState === "checking" ? "Checking..." : aiState === "fast_mode" ? "Standard" : aiState === "signin_required" ? "Sign In Required" : aiState === "expired" ? "Session Expired" : "Needs Attention";
     const authFlow = settings.authFlow || {};
-    const authPhase = String(authFlow.phase || "idle");
     const authMessage = String(authFlow.message || "");
     const authActive = !!authFlow.active;
     const hasApprovalLink = !!String(authFlow.verificationUrl || "").trim();
-    const onboardingNoteClass = authPhase === "error" ? "ps-inline-note is-error" : authActive ? "ps-inline-note is-info" : "ps-inline-note";
     const onboardingNote = authMessage || (authActive ? "Approve sign-in from your browser or email to continue." : "Start your free trial, then sign in.");
     const aiSummary = translationProvider === "polyscript" ? aiLabel || aiStatusTitle : "Google translation is ready.";
-    const aiNoteClass = aiState === "expired" || aiState === "signin_required" ? "ps-inline-note is-error" : "ps-inline-note is-info";
     const voiceSelectorOptions = Array.isArray((_a = settings.voiceSelector) == null ? void 0 : _a.options) ? settings.voiceSelector.options : [];
     const sentenceResumeValue = settings.sentenceAutoResume ? String(settings.sentenceAutoResumeDelay || 2) : "0";
     const applySentenceResume = (value) => {
@@ -24004,7 +24052,7 @@
       updateSetting("secondaryTargetLang", value);
       closeSecondaryMenu();
     };
-    return /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-sidebar" }, /* @__PURE__ */ import_react.default.createElement("header", { className: "ps-header" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-header-row" }, /* @__PURE__ */ import_react.default.createElement("img", { src: LOGO_SRC, alt: "", className: "ps-header-logo" }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h2", null, "Polyscript Beta"), /* @__PURE__ */ import_react.default.createElement("p", null, "Dual subtitles and AI reading tools for faster comprehension.")))), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-tab-bar" }, /* @__PURE__ */ import_react.default.createElement(
+    return /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-sidebar" }, /* @__PURE__ */ import_react.default.createElement("header", { className: "ps-header" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-brand-row" }, /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-brand-word" }, "Polyscript"), /* @__PURE__ */ import_react.default.createElement("span", { className: "ps-platform-badge" }, "IINA")), /* @__PURE__ */ import_react.default.createElement("h1", null, "Subtitle settings")), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-tab-bar" }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         className: `ps-tab ${activeTab === "settings" ? "is-active" : ""}`,
@@ -24023,49 +24071,26 @@
         }
       },
       "Transcript"
-    )), activeTab === "settings" ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-card-header" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h3", null, "Account"), /* @__PURE__ */ import_react.default.createElement("p", { className: "ps-card-note" }, loggedIn ? "Signed in and ready." : "Start your trial, then sign in.")), loggedIn ? /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn", type: "button", onClick: () => sendAction("signOut") }, "Sign Out") : null), loggedIn ? /* @__PURE__ */ import_react.default.createElement("div", { className: aiNoteClass }, aiSummary) : /* @__PURE__ */ import_react.default.createElement("div", { className: onboardingNoteClass }, onboardingNote), !loggedIn && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("label", null, "Trial / Sign-in Email"), /* @__PURE__ */ import_react.default.createElement(
-      "input",
+    )), activeTab === "settings" ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card ps-quick-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Quick Controls"), /* @__PURE__ */ import_react.default.createElement(
+      ToggleRow,
       {
-        className: "ps-input",
-        value: loginEmailDraft,
-        onChange: (e) => setLoginEmailDraft(e.target.value),
-        onBlur: () => persistLoginEmailDraft(),
-        disabled: authActive,
-        onKeyDown: (e) => {
-          if (e.key === "Enter" && !authActive) {
-            submitLoginAction("deviceLoginSaved");
-          }
-        },
-        placeholder: "you@example.com"
+        title: "Polyscript subtitles",
+        subtitle: "Show the subtitle overlay in IINA.",
+        enabled: subtitleEnabled,
+        onToggle: () => updateSetting("polyscriptEnabled", !subtitleEnabled)
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions" }, /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-quick-actions" }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         className: "ps-btn ps-btn-primary",
         type: "button",
-        disabled: authActive,
-        onClick: () => submitLoginAction("trialThenSignIn")
+        onClick: () => {
+          setActiveTab("transcript");
+          sendMessage("ps:getTranscript", {});
+        }
       },
-      "Start Free Trial + Sign In"
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        className: "ps-btn",
-        type: "button",
-        disabled: authActive,
-        onClick: () => submitLoginAction("deviceLoginSaved")
-      },
-      "Sign In"
-    )), authActive && /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions" }, /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        className: "ps-btn",
-        type: "button",
-        onClick: () => sendAction("openApprovalLink"),
-        disabled: !hasApprovalLink
-      },
-      "Open Approval Link"
-    ), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn", type: "button", onClick: () => sendAction("cancelDeviceLogin") }, "Cancel Sign-In")))), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-card-header" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h3", null, "Language"), /* @__PURE__ */ import_react.default.createElement("p", { className: "ps-card-note" }, "Search a language or type a custom AI target."))), /* @__PURE__ */ import_react.default.createElement("label", null, "Translate To"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-lang-combo" }, /* @__PURE__ */ import_react.default.createElement(
+      "Open Transcript"
+    ), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn ps-btn-green", type: "button", onClick: () => sendAction("restoreLayout") }, "Restore Layout"))), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-card-header" }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h3", null, "Language"), /* @__PURE__ */ import_react.default.createElement("p", { className: "ps-card-note" }, "Search a language or type a custom AI target."))), /* @__PURE__ */ import_react.default.createElement("label", null, "Translate To"), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-lang-combo" }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         ref: targetInputRef,
@@ -24233,15 +24258,7 @@
         },
         placeholder: "Optional style or tone guidance"
       }
-    )), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Reading Tools"), /* @__PURE__ */ import_react.default.createElement(
-      ToggleRow,
-      {
-        title: "Polyscript Subtitles",
-        subtitle: "Show translated overlay subtitles",
-        enabled: subtitleEnabled,
-        onToggle: () => updateSetting("polyscriptEnabled", !subtitleEnabled)
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
+    )), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Reading & Speech"), /* @__PURE__ */ import_react.default.createElement(
       ToggleRow,
       {
         title: "Transliteration",
@@ -24262,7 +24279,7 @@
         onToggle: () => updateSetting("segmentationEnabled", !settings.segmentationEnabled),
         hint: "G"
       }
-    )), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Speech"), /* @__PURE__ */ import_react.default.createElement(
+    )), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-card" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Voice & Pause"), /* @__PURE__ */ import_react.default.createElement(
       ToggleRow,
       {
         title: "Speaking Mode",
@@ -24332,7 +24349,49 @@
         value: (_q = (_p = settings.appearance) == null ? void 0 : _p.bgOpacity) != null ? _q : 0.85,
         onChange: (e) => updateSetting("overlayBgOpacity", parseFloat(e.target.value))
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions ps-actions-single" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn", type: "button", onClick: () => sendAction("restoreLayout") }, "Restore Layout")))) : null, activeTab === "transcript" ? /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions ps-actions-single" }, /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn", type: "button", onClick: () => sendAction("restoreLayout") }, "Restore Layout"))), /* @__PURE__ */ import_react.default.createElement("section", { className: "ps-account-footer" }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Account"), /* @__PURE__ */ import_react.default.createElement("div", { className: loggedIn ? "ps-account-link is-ready" : "ps-account-link" }, loggedIn ? aiSummary : onboardingNote), loggedIn ? /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn ps-btn-compact", type: "button", onClick: () => sendAction("signOut") }, "Sign Out") : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        className: "ps-input",
+        value: loginEmailDraft,
+        onChange: (e) => setLoginEmailDraft(e.target.value),
+        onBlur: () => persistLoginEmailDraft(),
+        disabled: authActive,
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && !authActive) {
+            submitLoginAction("deviceLoginSaved");
+          }
+        },
+        placeholder: "you@example.com"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions" }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        className: "ps-btn ps-btn-primary",
+        type: "button",
+        disabled: authActive,
+        onClick: () => submitLoginAction("trialThenSignIn")
+      },
+      "Start Trial"
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        className: "ps-btn",
+        type: "button",
+        disabled: authActive,
+        onClick: () => submitLoginAction("deviceLoginSaved")
+      },
+      "Sign In"
+    )), authActive ? /* @__PURE__ */ import_react.default.createElement("div", { className: "ps-actions" }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        className: "ps-btn",
+        type: "button",
+        onClick: () => sendAction("openApprovalLink"),
+        disabled: !hasApprovalLink
+      },
+      "Open Approval Link"
+    ), /* @__PURE__ */ import_react.default.createElement("button", { className: "ps-btn", type: "button", onClick: () => sendAction("cancelDeviceLogin") }, "Cancel")) : null))) : null, activeTab === "transcript" ? /* @__PURE__ */ import_react.default.createElement(
       TranscriptPanel,
       {
         entries: transcriptEntries,
@@ -24340,6 +24399,7 @@
         search: transcriptSearch,
         onSearchChange: setTranscriptSearch,
         activeRef: transcriptActiveRef,
+        hasSecondary: transcriptHasSecondary,
         showOriginal: settings.showOriginalTranscript === true,
         onToggleOriginal: () => updateSetting("showOriginalTranscript", settings.showOriginalTranscript !== true)
       }
