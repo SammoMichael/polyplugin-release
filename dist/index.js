@@ -1588,9 +1588,15 @@
       scheduleRender(lastRenderedText);
     }
   }
-  function setTargetLang(code) {
+  function setTargetLang(code, options = {}) {
+    var _a5;
     if (!GOOGLE_TRANSLATE_LANGS[code]) return;
+    const shouldClearCustomTarget = options.clearCustomTarget !== false;
     targetLang = code;
+    if (shouldClearCustomTarget && llmCustomTarget) {
+      llmCustomTarget = "";
+      (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "llmCustomTarget", "");
+    }
     if (preferences && typeof preferences.set === "function") {
       preferences.set("targetLang", code);
       if (typeof preferences.sync === "function") preferences.sync();
