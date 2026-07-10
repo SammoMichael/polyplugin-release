@@ -1,4 +1,294 @@
 (() => {
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __commonJS = (cb, mod) => function __require() {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  };
+
+  // src/generated/language-tables.js
+  var require_language_tables = __commonJS({
+    "src/generated/language-tables.js"(exports, module) {
+      (function initPolyscriptLanguageTables(global) {
+        const GOOGLE_TRANSLATE_LANGS2 = {
+          af: "Afrikaans",
+          ak: "Twi",
+          am: "Amharic",
+          ar: "Arabic",
+          as: "Assamese",
+          ay: "Aymara",
+          az: "Azerbaijani",
+          be: "Belarusian",
+          bg: "Bulgarian",
+          bho: "Bhojpuri",
+          bm: "Bambara",
+          bn: "Bengali",
+          bs: "Bosnian",
+          ca: "Catalan",
+          ceb: "Cebuano",
+          ckb: "Kurdish (Sorani)",
+          co: "Corsican",
+          cs: "Czech",
+          cy: "Welsh",
+          da: "Danish",
+          de: "German",
+          doi: "Dogri",
+          dv: "Dhivehi",
+          ee: "Ewe",
+          el: "Greek",
+          en: "English",
+          eo: "Esperanto",
+          es: "Spanish",
+          et: "Estonian",
+          eu: "Basque",
+          fa: "Persian",
+          fi: "Finnish",
+          fil: "Filipino",
+          fr: "French",
+          fy: "Frisian",
+          ga: "Irish",
+          gd: "Scots Gaelic",
+          gl: "Galician",
+          gn: "Guarani",
+          gom: "Konkani",
+          gu: "Gujarati",
+          ha: "Hausa",
+          haw: "Hawaiian",
+          he: "Hebrew",
+          hi: "Hindi",
+          hmn: "Hmong",
+          hr: "Croatian",
+          ht: "Haitian Creole",
+          hu: "Hungarian",
+          hy: "Armenian",
+          id: "Indonesian",
+          ig: "Igbo",
+          is: "Icelandic",
+          it: "Italian",
+          ja: "Japanese",
+          jw: "Javanese",
+          ka: "Georgian",
+          kk: "Kazakh",
+          km: "Khmer",
+          kn: "Kannada",
+          ko: "Korean",
+          kri: "Krio",
+          ku: "Kurdish",
+          ky: "Kyrgyz",
+          la: "Latin",
+          lb: "Luxembourgish",
+          lg: "Luganda",
+          ln: "Lingala",
+          lo: "Lao",
+          lt: "Lithuanian",
+          lus: "Mizo",
+          lv: "Latvian",
+          mai: "Maithili",
+          mg: "Malagasy",
+          mi: "Maori",
+          mk: "Macedonian",
+          ml: "Malayalam",
+          mn: "Mongolian",
+          "mni-Mtei": "Meiteilon (Manipuri)",
+          mr: "Marathi",
+          ms: "Malay",
+          mt: "Maltese",
+          my: "Myanmar (Burmese)",
+          ne: "Nepali",
+          nl: "Dutch",
+          no: "Norwegian",
+          nso: "Sepedi",
+          ny: "Nyanja (Chichewa)",
+          om: "Oromo",
+          or: "Odia (Oriya)",
+          pa: "Punjabi",
+          pl: "Polish",
+          ps: "Pashto",
+          pt: "Portuguese",
+          qu: "Quechua",
+          ro: "Romanian",
+          ru: "Russian",
+          rw: "Kinyarwanda",
+          sa: "Sanskrit",
+          sd: "Sindhi",
+          si: "Sinhala",
+          sk: "Slovak",
+          sl: "Slovenian",
+          sm: "Samoan",
+          sn: "Shona",
+          so: "Somali",
+          sq: "Albanian",
+          sr: "Serbian",
+          st: "Sesotho",
+          su: "Sundanese",
+          sv: "Swedish",
+          sw: "Swahili",
+          ta: "Tamil",
+          te: "Telugu",
+          tg: "Tajik",
+          th: "Thai",
+          ti: "Tigrinya",
+          tk: "Turkmen",
+          tl: "Tagalog (Filipino)",
+          tr: "Turkish",
+          ts: "Tsonga",
+          tt: "Tatar",
+          ug: "Uyghur",
+          uk: "Ukrainian",
+          ur: "Urdu",
+          uz: "Uzbek",
+          vi: "Vietnamese",
+          xh: "Xhosa",
+          yi: "Yiddish",
+          yo: "Yoruba",
+          "zh-CN": "Chinese (Simplified)",
+          "zh-TW": "Chinese (Traditional)",
+          zu: "Zulu"
+        };
+        function trim(value) {
+          return String(value == null ? "" : value).trim();
+        }
+        function getLanguageLabel(code) {
+          const raw = trim(code);
+          if (!raw) return "";
+          if (Object.prototype.hasOwnProperty.call(GOOGLE_TRANSLATE_LANGS2, raw)) return GOOGLE_TRANSLATE_LANGS2[raw];
+          const lower = raw.toLowerCase();
+          const entry = Object.entries(GOOGLE_TRANSLATE_LANGS2).find(([c]) => c.toLowerCase() === lower);
+          return entry ? entry[1] : raw;
+        }
+        function isGoogleTranslateLanguage(code) {
+          const raw = trim(code);
+          if (!raw) return false;
+          if (Object.prototype.hasOwnProperty.call(GOOGLE_TRANSLATE_LANGS2, raw)) return true;
+          const lower = raw.toLowerCase();
+          return Object.keys(GOOGLE_TRANSLATE_LANGS2).some((c) => c.toLowerCase() === lower);
+        }
+        function resolveLanguageInput2(input) {
+          const raw = trim(input);
+          if (!raw) return null;
+          const lower = raw.toLowerCase();
+          if (Object.prototype.hasOwnProperty.call(GOOGLE_TRANSLATE_LANGS2, raw)) return raw;
+          const exact = Object.entries(GOOGLE_TRANSLATE_LANGS2).find(
+            ([code, name]) => code.toLowerCase() === lower || String(name).toLowerCase() === lower
+          );
+          if (exact) return exact[0];
+          const partial = Object.entries(GOOGLE_TRANSLATE_LANGS2).find(
+            ([, name]) => String(name).toLowerCase().includes(lower)
+          );
+          return partial ? partial[0] : null;
+        }
+        const api = {
+          GOOGLE_TRANSLATE_LANGS: GOOGLE_TRANSLATE_LANGS2,
+          getLanguageLabel,
+          isGoogleTranslateLanguage,
+          resolveLanguageInput: resolveLanguageInput2
+        };
+        if (global) {
+          global.PolyscriptLanguageTables = global.PolyscriptLanguageTables || api;
+        }
+        if (typeof module !== "undefined" && module.exports) {
+          module.exports = api;
+        }
+      })(typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : null);
+    }
+  });
+
+  // src/generated/translation-helpers.js
+  var require_translation_helpers = __commonJS({
+    "src/generated/translation-helpers.js"(exports, module) {
+      (function initPolyscriptTranslationHelpers(global) {
+        const GOOGLE_TRANSLATE_SEPARATOR = "\n\u27EA\xA7\xA7\xA7PS99991\xA7\xA7\xA7\u27EB\n";
+        const GOOGLE_TRANSLATE_URL_CAP = 1800;
+        function trim(value) {
+          return String(value == null ? "" : value).trim();
+        }
+        function sanitizeTranslatedText(text) {
+          return trim(
+            String(text || "").replace(/<\s*[|!/iIlL]?\s*polyscript-[^>\n]{0,120}>?/gi, " ").replace(/\|\s*polyscript-[^\s<>{}[\]]+/gi, " ").replace(/\s{2,}/g, " ")
+          );
+        }
+        function splitBulkTranslationByMarkers(combinedTranslation, separator, expectedCount) {
+          const source = String(combinedTranslation || "");
+          if (!source) return [];
+          const exactSplit = source.split(separator).map((part) => sanitizeTranslatedText(part));
+          if (exactSplit.length === expectedCount) return exactSplit;
+          const markerNormalized = source.replace(/<\s*[|!/iIlL]?\s*polyscript-[^>\n]{0,120}>?/gi, separator).replace(/\|\s*polyscript-[^\s<>{}[\]]+/gi, separator);
+          const markerSplit = markerNormalized.split(separator).map((part) => sanitizeTranslatedText(part)).filter((part) => part.length > 0);
+          if (markerSplit.length === expectedCount) return markerSplit;
+          return exactSplit;
+        }
+        function buildGoogleTranslateUrl(text, targetLang2) {
+          return `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang2 || "en")}&dt=t&dt=rm&q=${encodeURIComponent(String(text || ""))}`;
+        }
+        function parseGoogleTranslatePayload(text) {
+          try {
+            const data = JSON.parse(String(text || ""));
+            let translation = "";
+            if (Array.isArray(data && data[0])) {
+              data[0].forEach((segment) => {
+                if (segment && Array.isArray(segment) && segment[0]) {
+                  translation += segment[0];
+                }
+              });
+            }
+            return sanitizeTranslatedText(translation);
+          } catch (_) {
+            return "";
+          }
+        }
+        function parseGoogleRomanizationPayload(text) {
+          try {
+            const data = JSON.parse(String(text || ""));
+            if (Array.isArray(data && data[0])) {
+              for (let i = data[0].length - 1; i >= 0; i -= 1) {
+                const segment = data[0][i];
+                if (segment && Array.isArray(segment) && (segment[0] === null || segment[0] === void 0) && typeof segment[3] === "string" && segment[3].trim()) {
+                  return segment[3];
+                }
+              }
+            }
+          } catch (_) {
+          }
+          return "";
+        }
+        function chunkTextsForGoogle(texts, urlCap = GOOGLE_TRANSLATE_URL_CAP) {
+          const list = Array.isArray(texts) ? texts : [];
+          const chunks = [];
+          let current = [];
+          let currentLen = 0;
+          for (const text of list) {
+            const encodedLength = encodeURIComponent(String(text || "")).length;
+            if (current.length && currentLen + encodedLength + GOOGLE_TRANSLATE_SEPARATOR.length > urlCap) {
+              chunks.push({ texts: current, combined: current.join(GOOGLE_TRANSLATE_SEPARATOR) });
+              current = [];
+              currentLen = 0;
+            }
+            current.push(text);
+            currentLen += encodedLength + GOOGLE_TRANSLATE_SEPARATOR.length;
+          }
+          if (current.length) {
+            chunks.push({ texts: current, combined: current.join(GOOGLE_TRANSLATE_SEPARATOR) });
+          }
+          return chunks;
+        }
+        const api = {
+          GOOGLE_TRANSLATE_SEPARATOR,
+          GOOGLE_TRANSLATE_URL_CAP,
+          sanitizeTranslatedText,
+          splitBulkTranslationByMarkers,
+          buildGoogleTranslateUrl,
+          parseGoogleTranslatePayload,
+          parseGoogleRomanizationPayload,
+          chunkTextsForGoogle
+        };
+        if (global) {
+          global.PolyscriptTranslationHelpers = global.PolyscriptTranslationHelpers || api;
+        }
+        if (typeof module !== "undefined" && module.exports) {
+          module.exports = api;
+        }
+      })(typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : null);
+    }
+  });
+
   // src/index.js
   var {
     core,
@@ -412,6 +702,13 @@
     }
     return http.post(normalized, options);
   }
+  function safeHttpPut(url, options) {
+    const normalized = String(url || "").trim();
+    if (!http || !isSafeHttpRequestUrl(normalized)) {
+      throw new Error(`Invalid HTTP PUT URL: ${normalized}`);
+    }
+    return http.put(normalized, options);
+  }
   function normalizeSentenceSettings(raw = {}) {
     const delay = Number(raw.delay);
     return {
@@ -724,141 +1021,12 @@
     high: "High",
     custom: "Custom"
   };
-  var GOOGLE_TRANSLATE_LANGS = {
-    "af": "Afrikaans",
-    "sq": "Albanian",
-    "am": "Amharic",
-    "ar": "Arabic",
-    "hy": "Armenian",
-    "as": "Assamese",
-    "ay": "Aymara",
-    "az": "Azerbaijani",
-    "bm": "Bambara",
-    "eu": "Basque",
-    "be": "Belarusian",
-    "bn": "Bengali",
-    "bho": "Bhojpuri",
-    "bs": "Bosnian",
-    "bg": "Bulgarian",
-    "ca": "Catalan",
-    "ceb": "Cebuano",
-    "zh-CN": "Chinese (Simplified)",
-    "zh-TW": "Chinese (Traditional)",
-    "co": "Corsican",
-    "hr": "Croatian",
-    "cs": "Czech",
-    "da": "Danish",
-    "dv": "Dhivehi",
-    "doi": "Dogri",
-    "nl": "Dutch",
-    "en": "English",
-    "eo": "Esperanto",
-    "et": "Estonian",
-    "ee": "Ewe",
-    "fil": "Filipino",
-    "fi": "Finnish",
-    "fr": "French",
-    "fy": "Frisian",
-    "gl": "Galician",
-    "ka": "Georgian",
-    "de": "German",
-    "el": "Greek",
-    "gn": "Guarani",
-    "gu": "Gujarati",
-    "ht": "Haitian Creole",
-    "ha": "Hausa",
-    "haw": "Hawaiian",
-    "he": "Hebrew",
-    "hi": "Hindi",
-    "hmn": "Hmong",
-    "hu": "Hungarian",
-    "is": "Icelandic",
-    "ig": "Igbo",
-    "id": "Indonesian",
-    "ga": "Irish",
-    "it": "Italian",
-    "ja": "Japanese",
-    "jw": "Javanese",
-    "kn": "Kannada",
-    "kk": "Kazakh",
-    "km": "Khmer",
-    "rw": "Kinyarwanda",
-    "gom": "Konkani",
-    "ko": "Korean",
-    "kri": "Krio",
-    "ku": "Kurdish",
-    "ckb": "Kurdish (Sorani)",
-    "ky": "Kyrgyz",
-    "lo": "Lao",
-    "la": "Latin",
-    "lv": "Latvian",
-    "ln": "Lingala",
-    "lt": "Lithuanian",
-    "lg": "Luganda",
-    "lb": "Luxembourgish",
-    "mk": "Macedonian",
-    "mai": "Maithili",
-    "mg": "Malagasy",
-    "ms": "Malay",
-    "ml": "Malayalam",
-    "mt": "Maltese",
-    "mi": "Maori",
-    "mr": "Marathi",
-    "mni-Mtei": "Meiteilon (Manipuri)",
-    "lus": "Mizo",
-    "mn": "Mongolian",
-    "my": "Myanmar (Burmese)",
-    "ne": "Nepali",
-    "no": "Norwegian",
-    "ny": "Nyanja (Chichewa)",
-    "or": "Odia (Oriya)",
-    "om": "Oromo",
-    "ps": "Pashto",
-    "fa": "Persian",
-    "pl": "Polish",
-    "pt": "Portuguese",
-    "pa": "Punjabi",
-    "qu": "Quechua",
-    "ro": "Romanian",
-    "ru": "Russian",
-    "sm": "Samoan",
-    "sa": "Sanskrit",
-    "gd": "Scots Gaelic",
-    "nso": "Sepedi",
-    "sr": "Serbian",
-    "st": "Sesotho",
-    "sn": "Shona",
-    "sd": "Sindhi",
-    "si": "Sinhala",
-    "sk": "Slovak",
-    "sl": "Slovenian",
-    "so": "Somali",
-    "es": "Spanish",
-    "su": "Sundanese",
-    "sw": "Swahili",
-    "sv": "Swedish",
-    "tl": "Tagalog (Filipino)",
-    "tg": "Tajik",
-    "ta": "Tamil",
-    "tt": "Tatar",
-    "te": "Telugu",
-    "th": "Thai",
-    "ti": "Tigrinya",
-    "ts": "Tsonga",
-    "tr": "Turkish",
-    "tk": "Turkmen",
-    "ak": "Twi",
-    "uk": "Ukrainian",
-    "ur": "Urdu",
-    "ug": "Uyghur",
-    "uz": "Uzbek",
-    "vi": "Vietnamese",
-    "cy": "Welsh",
-    "xh": "Xhosa",
-    "yi": "Yiddish",
-    "yo": "Yoruba",
-    "zu": "Zulu"
-  };
+  var { GOOGLE_TRANSLATE_LANGS, getLanguageLabel: sharedGetLanguageLabel, resolveLanguageInput: sharedResolveLanguageInput } = require_language_tables();
+  var {
+    GOOGLE_TRANSLATE_SEPARATOR: SHARED_GT_SEPARATOR,
+    splitBulkTranslationByMarkers: sharedSplitBulkTranslation,
+    chunkTextsForGoogle: sharedChunkTextsForGoogle
+  } = require_translation_helpers();
   if (!GOOGLE_TRANSLATE_LANGS[targetLang]) {
     targetLang = "en";
   }
@@ -907,21 +1075,10 @@
     }
   ];
   function getLangLabel(code) {
-    return GOOGLE_TRANSLATE_LANGS[code] || code;
+    return sharedGetLanguageLabel(code);
   }
   function resolveLanguageInput(input) {
-    const raw = String(input || "").trim();
-    if (!raw) return null;
-    const lower = raw.toLowerCase();
-    if (GOOGLE_TRANSLATE_LANGS[raw]) return raw;
-    const exact = Object.entries(GOOGLE_TRANSLATE_LANGS).find(
-      ([code, name]) => code.toLowerCase() === lower || String(name).toLowerCase() === lower
-    );
-    if (exact) return exact[0];
-    const partial = Object.entries(GOOGLE_TRANSLATE_LANGS).find(
-      ([code, name]) => String(name).toLowerCase().includes(lower)
-    );
-    return partial ? partial[0] : null;
+    return sharedResolveLanguageInput(input);
   }
   function resolveTtsLanguageSubstitution(input) {
     const normalizeAlias = (value) => String(value || "").toLowerCase().replace(/[_-]/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -1258,6 +1415,17 @@
         font-weight: 500;
         opacity: 0.9;
         display: ${showTransliteration ? "block" : "none"};
+      }
+      /* Per-character ruby (backend token path): reading sits directly above each character,
+         matching the amber transliteration color the plugin has always used. */
+      .ps-word ruby { ruby-align: center; }
+      .ps-word ruby rt {
+        font-size: ${preset.translit};
+        color: #fbbf24;
+        font-weight: 500;
+        opacity: 0.9;
+        line-height: 1.1;
+        display: ${showTransliteration ? "ruby-text" : "none"};
       }
       .ps-word {
         cursor: pointer;
@@ -1608,7 +1776,7 @@
     subtitleEntries = null;
     lastSentenceIndex = -1;
     currentTranslateJobId += 1;
-    core.osd(`POLYSCRIPT: Target language set to ${getLangLabel(code)}`, 2e3);
+    core.osd(`POLYSCRIPT: Primary subtitle language set to ${getLangLabel(code)}`, 2e3);
     translateCurrentSubtitleFile();
     buildMenu();
   }
@@ -2934,6 +3102,22 @@
       }
       if ((resp == null ? void 0 : resp.statusCode) === 401 && invalidateOnUnauthorized) {
         handleExpiredPolyscriptSession();
+      }
+    }
+    return resp;
+  }
+  async function authedPut(url, options = {}) {
+    const token = await getValidPolyscriptToken();
+    if (!token) return { statusCode: 401, text: "missing_token", data: null };
+    const headers = { ...options.headers || {}, Authorization: `Bearer ${token}` };
+    let resp = await safeHttpPut(url, { ...options, headers });
+    if ((resp == null ? void 0 : resp.statusCode) === 401) {
+      const refreshed = await getValidPolyscriptToken({ forceRefresh: true });
+      if (refreshed && refreshed !== token) {
+        resp = await safeHttpPut(url, {
+          ...options,
+          headers: { ...options.headers || {}, Authorization: `Bearer ${refreshed}` }
+        });
       }
     }
     return resp;
@@ -5044,6 +5228,11 @@ ws.onmessage = (event) => {
       }, { keyBinding: "cmd+shift+v" })
     );
     menu.addItem(
+      menu.item("Cast to TV via Polyscript", () => {
+        void castToTvViaPolyscript();
+      })
+    );
+    menu.addItem(
       menu.item("Re-translate Subtitles", () => {
         translateCurrentSubtitleFile();
       }, { keyBinding: "cmd+shift+r" })
@@ -5094,14 +5283,19 @@ ws.onmessage = (event) => {
         })
       );
       menu.addItem(
+        menu.item("Cast to TV via Polyscript", () => {
+          void castToTvViaPolyscript();
+        })
+      );
+      menu.addItem(
         menu.item("Device Login (Email)...", async () => {
           await startDeviceLogin();
         })
       );
       menu.addItem(
-        menu.item("Target Language...", () => {
+        menu.item("Primary Subtitle Language...", () => {
           var _a5;
-          const input = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Target language (name or code)", getLangLabel(targetLang));
+          const input = (_a5 = utils == null ? void 0 : utils.prompt) == null ? void 0 : _a5.call(utils, "Primary subtitle language (name or code)", getLangLabel(targetLang));
           const resolved = resolveLanguageInput(input);
           if (!resolved) {
             core.osd("POLYSCRIPT: Language not found", 1500);
@@ -5125,7 +5319,7 @@ ws.onmessage = (event) => {
         })
       );
       menu.addItem(
-        menu.item("LLM Target Language...", () => {
+        menu.item("LLM Primary Subtitle Language...", () => {
           promptSetLlmTargetLang();
           buildMenu();
         }, { keyBinding: "cmd+shift+l" })
@@ -5213,7 +5407,7 @@ ws.onmessage = (event) => {
         })
       );
       quickRoot.addSubMenuItem(
-        menu.item(`LLM Target Language: ${llmCustomTarget || targetLang}`, () => {
+        menu.item(`LLM Primary Subtitle Language: ${llmCustomTarget || targetLang}`, () => {
           promptSetLlmTargetLang();
           buildMenu();
         })
@@ -5228,13 +5422,13 @@ ws.onmessage = (event) => {
         );
       });
       llmPresetRoot.addSubMenuItem(
-        menu.item("Use Default Target Language", () => {
+        menu.item("Use Default Primary Subtitle Language", () => {
           setLlmTargetLang("");
           buildMenu();
         })
       );
       quickRoot.addSubMenuItem(llmPresetRoot);
-      quickRoot.addSubMenuItem(menu.item("Set LLM Target Language...", () => {
+      quickRoot.addSubMenuItem(menu.item("Set LLM Primary Subtitle Language...", () => {
         promptSetLlmTargetLang();
         buildMenu();
       }, { keyBinding: "cmd+shift+l" }));
@@ -5681,7 +5875,7 @@ ws.onmessage = (event) => {
       );
       menu.addItem(layoutRoot);
       menu.addItem(menu.separator());
-      const langRoot = menu.item(`Target Language (${getLangLabel(targetLang)})`);
+      const langRoot = menu.item(`Primary Subtitle Language (${getLangLabel(targetLang)})`);
       const entries = Object.entries(GOOGLE_TRANSLATE_LANGS).sort((a, b) => {
         const nameA = a[1].toLowerCase();
         const nameB = b[1].toLowerCase();
@@ -6055,7 +6249,7 @@ ws.onmessage = (event) => {
           })
         );
         llmRoot.addSubMenuItem(
-          menu.item("Set LLM Target Language...", () => {
+          menu.item("Set LLM Primary Subtitle Language...", () => {
             promptSetLlmTargetLang();
             buildMenu();
           })
@@ -6070,7 +6264,7 @@ ws.onmessage = (event) => {
           );
         });
         llmPresetRoot2.addSubMenuItem(
-          menu.item("Use Default Target Language", () => {
+          menu.item("Use Default Primary Subtitle Language", () => {
             setLlmTargetLang("");
             buildMenu();
           })
@@ -6465,6 +6659,79 @@ ws.onmessage = (event) => {
       }
     }
   }
+  var translitTokensCache = /* @__PURE__ */ new Map();
+  async function fetchTransliterationBatch(texts) {
+    const wanted = Array.from(new Set((texts || []).map((t) => String(t || "")).filter(Boolean))).filter((t) => !translitTokensCache.has(t) && !translitPending.has(t)).slice(0, 40);
+    if (!wanted.length) return;
+    wanted.forEach((t) => translitPending.add(t));
+    let anyStored = false;
+    try {
+      try {
+        const base = String(polyscriptBaseUrl || DEFAULT_POLYSCRIPT_BASE_URL).replace(/\/+$/, "");
+        const resp = await authedPost(`${base}/api/transcript/transliterate`, {
+          headers: { "Content-Type": "application/json" },
+          data: { texts: wanted, source_lang: "auto" }
+        });
+        const json = (resp == null ? void 0 : resp.data) && typeof resp.data === "object" ? resp.data : null;
+        if ((resp == null ? void 0 : resp.statusCode) >= 200 && (resp == null ? void 0 : resp.statusCode) < 300 && json) {
+          wanted.forEach((text, i) => {
+            const reading = Array.isArray(json.readings) ? String(json.readings[i] || "").trim() : "";
+            const tokens = Array.isArray(json.tokens) && Array.isArray(json.tokens[i]) ? json.tokens[i] : null;
+            if (tokens && tokens.some((t) => t && String(t.r || "").trim())) {
+              translitTokensCache.set(text, tokens);
+              anyStored = true;
+            }
+            if (reading) {
+              translitCache.set(normalizeWord(text), reading);
+              anyStored = true;
+            }
+          });
+          if (anyStored) return;
+        }
+      } catch (_) {
+      }
+      for (const text of wanted) {
+        try {
+          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(DICT_LANG)}&dt=rm&q=${encodeURIComponent(text)}`;
+          const res = await safeHttpGet(url);
+          const data = res.data;
+          let translit = "";
+          if (data && data[0] && data[0][data[0].length - 1] && data[0][data[0].length - 1][3]) {
+            translit = data[0][data[0].length - 1][3] || "";
+          }
+          if (translit) {
+            translitCache.set(normalizeWord(text), translit);
+            anyStored = true;
+          }
+        } catch (_) {
+        }
+      }
+    } finally {
+      wanted.forEach((t) => {
+        const key = normalizeWord(t);
+        if (!translitTokensCache.has(t) && !translitCache.has(key)) {
+          translitCache.set(key, "");
+        }
+        translitPending.delete(t);
+      });
+      if (anyStored && lastRenderedText) {
+        scheduleRender(lastRenderedText);
+      }
+    }
+  }
+  function buildWordRubyHtml(word, tokens) {
+    const list = Array.isArray(tokens) ? tokens : [];
+    const concat = list.map((t) => String((t == null ? void 0 : t.t) || "")).join("");
+    if (!concat || concat.replace(/\s+/g, "") !== String(word).replace(/\s+/g, "")) return "";
+    let html = "";
+    for (const tok of list) {
+      const bare = String((tok == null ? void 0 : tok.t) || "");
+      if (!bare) continue;
+      const reading = String((tok == null ? void 0 : tok.r) || "").trim();
+      html += reading ? `<ruby>${escapeHtml(bare)}<rt>${escapeHtml(reading)}</rt></ruby>` : escapeHtml(bare);
+    }
+    return html;
+  }
   function cleanWord(word) {
     return word.replace(/[.,!?;:"'()]/g, "").trim();
   }
@@ -6479,6 +6746,11 @@ ws.onmessage = (event) => {
     } catch {
       return cleanWord(raw) || raw.trim();
     }
+  }
+  function shouldTransliterate(word) {
+    if (!word || word.length > 20) return false;
+    if (/^[a-zA-Z0-9\s.,!?'"-]+$/.test(word)) return false;
+    return true;
   }
   function shouldLookup(word) {
     if (!word || word.length > 24) return false;
@@ -6774,8 +7046,8 @@ ws.onmessage = (event) => {
       scheduleDictionaryOverlayRefresh();
     }
   }
-  function segmentText(text, lang) {
-    if (!isSegmentationEnabled()) {
+  function segmentText(text, lang, forceSegmentation = false) {
+    if (!isSegmentationEnabled() && !forceSegmentation) {
       return text.split(/(\s+)/).filter((t) => t.length > 0).map((t) => ({
         text: t,
         isWord: !/^\s+$/.test(t)
@@ -7108,6 +7380,17 @@ Only output the transformed text, nothing else.`,
     }
     return "en";
   }
+  function detectSegmentationLangForText(text) {
+    const value = String(text || "");
+    if (!value) return "";
+    if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value)) return "ja";
+    if (/[\p{Script=Han}]/u.test(value)) return "zh";
+    if (/[\p{Script=Thai}]/u.test(value)) return "th";
+    if (/[\p{Script=Lao}]/u.test(value)) return "lo";
+    if (/[\p{Script=Khmer}]/u.test(value)) return "km";
+    if (/[\p{Script=Myanmar}]/u.test(value)) return "my";
+    return "";
+  }
   async function translateTextLLM(text, target) {
     const input = buildNumberedInput([text], 0);
     let prompt;
@@ -7322,8 +7605,14 @@ Only output the transformed text, nothing else.`,
     applySubtitleLayout();
     const lines = text.split("\n");
     const wordsToTranslit = /* @__PURE__ */ new Set();
+    const segmentsToTranslit = /* @__PURE__ */ new Set();
     const htmlLines = lines.map((line) => {
-      const segments = segmentText(line, getSegmentationLang());
+      const detectedSegLang = detectSegmentationLangForText(line);
+      const segments = segmentText(
+        line,
+        detectedSegLang || getSegmentationLang(),
+        Boolean(showTransliteration && detectedSegLang)
+      );
       const words = segments.map((seg) => {
         const segText = seg.text || "";
         if (!segText) return "";
@@ -7335,11 +7624,17 @@ Only output the transformed text, nothing else.`,
         if (shouldLookup(key) && !dictCache.has(key)) {
           wordsToTranslit.add(key);
         }
-        const translitHtml = showTransliteration && cachedTranslit ? `<span class="ps-transliteration">${escapeHtml(cachedTranslit)}</span>` : `<span class="ps-transliteration" style="display:none"></span>`;
+        if (showTransliteration && shouldTransliterate(segText) && !translitTokensCache.has(segText) && !translitCache.has(key)) {
+          segmentsToTranslit.add(segText);
+        }
+        const cachedTokens = translitTokensCache.get(key) || translitTokensCache.get(segText);
+        const wordRubyHtml = showTransliteration && cachedTokens ? buildWordRubyHtml(segText, cachedTokens) : "";
+        const translitHtml = showTransliteration && cachedTranslit && !wordRubyHtml ? `<span class="ps-transliteration">${escapeHtml(cachedTranslit)}</span>` : `<span class="ps-transliteration" style="display:none"></span>`;
         const tooltipHtml = buildTooltipHtml(key, segText);
         const tooltip = tooltipHtml ? `<div class="ps-tooltip" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();" onmouseenter="${keepOpenJs}" onmouseleave="${scheduleCloseJs}" onwheel="event.stopPropagation(); event.preventDefault(); this.scrollTop += event.deltaY;">${tooltipHtml}</div>` : "";
         const wordAttrs = `data-clickable data-word="${escapeHtml(segText)}" onclick="event.stopPropagation();" onmouseenter="${scheduleOpenJs} if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'word',text:this.getAttribute('data-word')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'word',text:this.getAttribute('data-word')}});} "`;
-        return `<span class="ps-word-container" onmouseleave="${scheduleCloseJs}">${translitHtml}<span class="ps-word" ${wordAttrs}>${escapeHtml(segText)}</span>${tooltip}</span>`;
+        const wordInnerHtml = wordRubyHtml || escapeHtml(segText);
+        return `<span class="ps-word-container" onmouseleave="${scheduleCloseJs}">${translitHtml}<span class="ps-word" ${wordAttrs}>${wordInnerHtml}</span>${tooltip}</span>`;
       }).join("");
       const lineSay = getSpeakableText(line);
       const lineAttrs = `data-clickable data-line="${escapeHtml(line)}" data-say="${escapeHtml(lineSay)}" onclick="${dismissAllPopupsJs} if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:tts',{kind:'line',text:this.getAttribute('data-say')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:tts',data:{kind:'line',text:this.getAttribute('data-say')}});} " onmouseenter="if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'line',text:this.getAttribute('data-line')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'line',text:this.getAttribute('data-line')}});} "`;
@@ -7360,6 +7655,9 @@ Only output the transformed text, nothing else.`,
         enqueueWordInfo(w);
         count += 1;
       });
+    }
+    if (segmentsToTranslit.size > 0) {
+      void fetchTransliterationBatch(Array.from(segmentsToTranslit));
     }
     return true;
   }
@@ -8319,6 +8617,88 @@ Only output the transformed text, nothing else.`,
       return null;
     }
   }
+  function getVideoWebUrl() {
+    try {
+      const path = String(mpv.getString("path") || "");
+      if (/^https?:\/\//.test(path)) return path;
+      if (path.startsWith("ytdl://")) return `https://www.youtube.com/watch?v=${path.slice(7)}`;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  async function castToTvViaPolyscript() {
+    const webUrl = getVideoWebUrl();
+    if (!webUrl) {
+      core.osd("POLYSCRIPT: Casting needs a web video (YouTube etc.) \u2014 local files can't be cast yet.", 3200);
+      return;
+    }
+    let mediaTitle = "";
+    try {
+      mediaTitle = String(mpv.getString("media-title") || "").slice(0, 300);
+    } catch {
+    }
+    let positionSeconds = 0;
+    try {
+      positionSeconds = Math.max(0, Math.round(Number(mpv.getNumber("time-pos") || 0) * 100) / 100);
+    } catch {
+    }
+    let durationSeconds = null;
+    try {
+      const rawDuration = Number(mpv.getNumber("duration") || 0);
+      durationSeconds = rawDuration > 0 ? Math.round(rawDuration * 100) / 100 : null;
+    } catch {
+    }
+    let ytId = "";
+    try {
+      ytId = (webUrl.match(/[?&]v=([A-Za-z0-9_-]{11})/) || [])[1] || "";
+    } catch {
+    }
+    const secondaryLang = getSecondaryTargetLang();
+    const isDual = !!secondaryLang || showSourceSubtitles;
+    const ctx = {
+      source: "iina_plugin",
+      media_key: ytId || webUrl,
+      page_url: webUrl,
+      media_url: webUrl,
+      media_title: mediaTitle,
+      source_language: "",
+      target_language: String(targetLang || ""),
+      subtitle_mode: isDual ? "dual" : "single",
+      position_seconds: positionSeconds,
+      duration_seconds: durationSeconds,
+      metadata: {
+        transliteration: !!showTransliteration,
+        config: {
+          primaryLanguage: String(targetLang || ""),
+          secondaryLanguage: String(secondaryLang || ""),
+          transliteration: !!showTransliteration,
+          segmentation: true
+        }
+      }
+    };
+    try {
+      const base = String(polyscriptBaseUrl || DEFAULT_POLYSCRIPT_BASE_URL).replace(/\/+$/, "");
+      const resp = await authedPut(`${base}/api/sync/watch-state`, {
+        headers: { "Content-Type": "application/json" },
+        data: ctx
+      });
+      if ((resp == null ? void 0 : resp.statusCode) === 401) {
+        core.osd("POLYSCRIPT: Sign in first (Polyscript Panel -> Account) to cast.", 3200);
+        return;
+      }
+      if (!((resp == null ? void 0 : resp.statusCode) >= 200 && (resp == null ? void 0 : resp.statusCode) < 300)) {
+        core.osd(`POLYSCRIPT: Cast handoff failed (${(resp == null ? void 0 : resp.statusCode) || "network"}).`, 3200);
+        return;
+      }
+      core.osd("POLYSCRIPT: Session sent \u2014 continue or cast from your other devices.", 2600);
+      const timestamp = positionSeconds > 5 ? Math.floor(positionSeconds) : 0;
+      const separator = webUrl.includes("?") ? "&" : "?";
+      await openUrlExternal(timestamp > 0 ? `${webUrl}${separator}t=${timestamp}s` : webUrl);
+    } catch (e) {
+      core.osd("POLYSCRIPT: Cast handoff failed.", 2600);
+    }
+  }
   function getVideoPath() {
     try {
       const path = mpv.getString("path");
@@ -8583,28 +8963,16 @@ ${e.content}
       return translateBatchLLM(texts, targetLang2);
     }
     const results = [];
-    const MAX_URL_LENGTH = 1800;
-    const separator = "\n<|polyscript-sep|>\n";
-    let currentChunk = [];
-    let currentLength = 0;
-    const flushChunk = async () => {
-      if (!currentChunk.length) return;
-      const combinedText = currentChunk.join(separator);
-      const combinedTranslation = await translateText(combinedText, targetLang2);
-      const translatedTexts = combinedTranslation.split(/\s*<\|polyscript-sep\|>\s*/);
+    const chunks = sharedChunkTextsForGoogle(texts);
+    for (const chunk of chunks) {
+      const combinedTranslation = await translateText(chunk.combined, targetLang2);
+      const translatedTexts = sharedSplitBulkTranslation(
+        combinedTranslation,
+        SHARED_GT_SEPARATOR,
+        chunk.texts.length
+      );
       results.push(...translatedTexts);
-      currentChunk = [];
-      currentLength = 0;
-    };
-    for (const text of texts) {
-      const encodedText = encodeURIComponent(text);
-      if (currentLength + encodedText.length + separator.length > MAX_URL_LENGTH) {
-        await flushChunk();
-      }
-      currentChunk.push(text);
-      currentLength += encodedText.length + separator.length;
     }
-    await flushChunk();
     return results;
   }
   async function translatePreparedSubtitleEntries(entries, targetLang2) {
