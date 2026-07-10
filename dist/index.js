@@ -6660,6 +6660,65 @@ ws.onmessage = (event) => {
     }
   }
   var translitTokensCache = /* @__PURE__ */ new Map();
+  var TRANSLIT_CACHE_FILE = "@data/translit-cache-v1.json";
+  var TRANSLIT_CACHE_LIMITS = { translit: 5e3, tokens: 3e3, dict: 500 };
+  var translitCacheSaveTimer = null;
+  function trimMapToLimit(map, limit) {
+    while (map.size > limit) {
+      const oldest = map.keys().next().value;
+      map.delete(oldest);
+    }
+  }
+  function loadPersistedTranslitCaches() {
+    try {
+      if (!file || typeof file.read !== "function") return;
+      if (typeof file.exists === "function" && !file.exists(TRANSLIT_CACHE_FILE)) return;
+      const raw = file.read(TRANSLIT_CACHE_FILE);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      for (const [k, v] of Object.entries(data.translit || {})) {
+        if (typeof v === "string" && v) translitCache.set(k, v);
+      }
+      for (const [k, v] of Object.entries(data.tokens || {})) {
+        if (Array.isArray(v) && v.length) translitTokensCache.set(k, v);
+      }
+      for (const [k, v] of Object.entries(data.dict || {})) {
+        if (v && typeof v === "object" && !dictCache.has(k)) dictCache.set(k, v);
+      }
+      console.log(`POLYSCRIPT: Loaded persisted caches (translit=${translitCache.size} tokens=${translitTokensCache.size} dict=${dictCache.size})`);
+    } catch (error) {
+      console.log(`POLYSCRIPT-WARN: Failed to load persisted translit caches: ${String((error == null ? void 0 : error.message) || error)}`);
+    }
+  }
+  function saveTranslitCachesNow() {
+    translitCacheSaveTimer = null;
+    try {
+      if (!file || typeof file.write !== "function") return;
+      trimMapToLimit(translitCache, TRANSLIT_CACHE_LIMITS.translit);
+      trimMapToLimit(translitTokensCache, TRANSLIT_CACHE_LIMITS.tokens);
+      trimMapToLimit(dictCache, TRANSLIT_CACHE_LIMITS.dict);
+      const data = { translit: {}, tokens: {}, dict: {} };
+      for (const [k, v] of translitCache) {
+        if (typeof v === "string" && v) data.translit[k] = v;
+      }
+      for (const [k, v] of translitTokensCache) {
+        if (Array.isArray(v) && v.length) data.tokens[k] = v;
+      }
+      for (const [k, v] of dictCache) {
+        if (v && (v.translation || v.translit || Array.isArray(v.dictionary) && v.dictionary.length)) {
+          data.dict[k] = v;
+        }
+      }
+      file.write(TRANSLIT_CACHE_FILE, JSON.stringify(data));
+    } catch (error) {
+      console.log(`POLYSCRIPT-WARN: Failed to save translit caches: ${String((error == null ? void 0 : error.message) || error)}`);
+    }
+  }
+  function scheduleTranslitCacheSave() {
+    if (translitCacheSaveTimer) clearTimeout(translitCacheSaveTimer);
+    translitCacheSaveTimer = setTimeout(saveTranslitCachesNow, 3e3);
+  }
+  loadPersistedTranslitCaches();
   async function fetchTransliterationBatch(texts) {
     const wanted = Array.from(new Set((texts || []).map((t) => String(t || "")).filter(Boolean))).filter((t) => !translitTokensCache.has(t) && !translitPending.has(t)).slice(0, 40);
     if (!wanted.length) return;
@@ -6702,6 +6761,7 @@ ws.onmessage = (event) => {
           if (translit) {
             translitCache.set(normalizeWord(text), translit);
             anyStored = true;
+            if (lastRenderedText) scheduleRender(lastRenderedText);
           }
         } catch (_) {
         }
@@ -6714,10 +6774,44 @@ ws.onmessage = (event) => {
         }
         translitPending.delete(t);
       });
-      if (anyStored && lastRenderedText) {
-        scheduleRender(lastRenderedText);
+      if (anyStored) {
+        scheduleTranslitCacheSave();
+        if (lastRenderedText) scheduleRender(lastRenderedText);
       }
     }
+  }
+  var TRANSLIT_PREFETCH_CUES = 10;
+  function prefetchUpcomingTransliterations() {
+    if (!showTransliteration || !Array.isArray(subtitleEntries) || !subtitleEntries.length) return;
+    let nowMs = null;
+    try {
+      const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
+      if (Number.isFinite(timePos)) nowMs = timePos * 1e3;
+    } catch (_) {
+    }
+    if (nowMs == null) return;
+    const segs = /* @__PURE__ */ new Set();
+    let taken = 0;
+    for (const entry of subtitleEntries) {
+      if (taken >= TRANSLIT_PREFETCH_CUES || segs.size >= 40) break;
+      const start = Number(entry == null ? void 0 : entry.startMs);
+      if (!Number.isFinite(start) || start < nowMs) continue;
+      taken += 1;
+      const text = String(entry.translatedContent || entry.content || "").replace(/\\n|\\N/g, "\n");
+      for (const line of text.split("\n")) {
+        const lang = detectSegmentationLangForText(line);
+        if (!lang) continue;
+        for (const seg of segmentText(line, lang, true)) {
+          const segText = seg.text || "";
+          if (!seg.isWord || !segText.trim()) continue;
+          if (!shouldTransliterate(segText)) continue;
+          if (translitTokensCache.has(segText) || translitCache.has(normalizeWord(segText))) continue;
+          segs.add(segText);
+          if (segs.size >= 40) break;
+        }
+      }
+    }
+    if (segs.size) void fetchTransliterationBatch(Array.from(segs));
   }
   function buildWordRubyHtml(word, tokens) {
     const list = Array.isArray(tokens) ? tokens : [];
@@ -7039,6 +7133,7 @@ ws.onmessage = (event) => {
       dictCache.set(key, info);
       const { translit } = info;
       if (translit) translitCache.set(key, translit);
+      scheduleTranslitCacheSave();
     } catch (e) {
       dictCache.set(key, { translation: "", translit: "", dictionary: [], morphology: null });
     } finally {
@@ -7586,9 +7681,9 @@ Only output the transformed text, nothing else.`,
     };
   }
   function renderSubtitleOverlay(rawText, sourceText = lastSourceOverlayText) {
-    const text = (rawText || "").replace(/\\n|\\N/g, "\n");
+    const text = stripAssOverrideTags((rawText || "").replace(/\\n|\\N/g, "\n"));
     const sourceLineText = getDistinctSecondarySubtitleText(
-      String(sourceText || "").replace(/\\n|\\N/g, "\n"),
+      stripAssOverrideTags(String(sourceText || "").replace(/\\n|\\N/g, "\n")),
       text
     );
     if (hasSecondaryOverlayRequirement() && !sourceLineText) {
@@ -7659,6 +7754,7 @@ Only output the transformed text, nothing else.`,
     if (segmentsToTranslit.size > 0) {
       void fetchTransliterationBatch(Array.from(segmentsToTranslit));
     }
+    prefetchUpcomingTransliterations();
     return true;
   }
   function maybeAutoSpeakRenderedText(text) {
@@ -8192,6 +8288,7 @@ Only output the transformed text, nothing else.`,
       loadTranscriptFromCurrentSubs();
       restartSubtitlePoller();
       syncNativeSubtitleVisibility();
+      prefetchUpcomingTransliterations();
     }).catch((error) => {
       console.log(`POLYSCRIPT-ERROR: Failed to prepare subtitle entries for ${reason}: ${String((error == null ? void 0 : error.message) || error)}`);
       syncNativeSubtitleVisibility();
@@ -8596,23 +8693,25 @@ Only output the transformed text, nothing else.`,
       return null;
     }
   }
-  function getEmbeddedSubTrackIndex() {
-    var _a5;
+  function getEmbeddedSubTrackIndexForTrack(track) {
     try {
-      const track = getSelectedSubTrack();
-      if (!track) return null;
-      const ffIndex = (_a5 = track["ff-index"]) != null ? _a5 : track["ff_index"];
-      return typeof ffIndex === "number" ? ffIndex : null;
+      if (!track || track.external) return null;
+      const tracks = typeof mpv.getNative === "function" ? mpv.getNative("track-list") : null;
+      if (Array.isArray(tracks)) {
+        const embeddedSubs = tracks.filter((t) => t && t.type === "sub" && !t.external).sort((a, b) => Number(a.id) - Number(b.id));
+        const position = embeddedSubs.findIndex((t) => Number(t.id) === Number(track.id));
+        if (position >= 0) return position;
+      }
+      const id = Number(track.id);
+      return Number.isFinite(id) && id >= 1 ? id - 1 : null;
     } catch {
       return null;
     }
   }
-  function getEmbeddedSubTrackIndexForTrack(track) {
-    var _a5;
+  function getEmbeddedSubTrackIndex() {
     try {
-      if (!track) return null;
-      const ffIndex = (_a5 = track["ff-index"]) != null ? _a5 : track["ff_index"];
-      return typeof ffIndex === "number" ? ffIndex : null;
+      const track = getSelectedSubTrack();
+      return getEmbeddedSubTrackIndexForTrack(track);
     } catch {
       return null;
     }
@@ -8744,37 +8843,70 @@ Only output the transformed text, nothing else.`,
   function getSubtitlePollIntervalMs() {
     return hasExactSubtitleTimeline() ? FILE_TIMELINE_SUBTITLE_POLL_MS : LIVE_SUBTITLE_POLL_MS;
   }
+  function stableStringHash(value) {
+    let h = 5381;
+    const str = String(value || "");
+    for (let i = 0; i < str.length; i += 1) {
+      h = (h << 5) + h + str.charCodeAt(i) >>> 0;
+    }
+    return h.toString(36);
+  }
+  var FFMPEG_CANDIDATE_PATHS = [
+    "/opt/homebrew/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/usr/bin/ffmpeg"
+  ];
+  function resolveFfmpegBinary() {
+    for (const candidate of FFMPEG_CANDIDATE_PATHS) {
+      try {
+        if (file.exists(candidate)) return candidate;
+      } catch (_) {
+      }
+    }
+    try {
+      if (utils && typeof utils.fileInPath === "function" && utils.fileInPath("ffmpeg")) return "ffmpeg";
+    } catch (_) {
+    }
+    return null;
+  }
   async function extractEmbeddedSubToSrt() {
-    if (!utils || typeof utils.fileInPath !== "function" || typeof utils.exec !== "function") {
+    if (!utils || typeof utils.exec !== "function") {
       return null;
     }
-    if (!utils.fileInPath("ffmpeg")) return null;
+    const ffmpegBin = resolveFfmpegBinary();
+    if (!ffmpegBin) return null;
     const videoPath = getVideoPath();
     const ffIndex = getEmbeddedSubTrackIndex();
     if (!videoPath || ffIndex == null) return null;
-    const outPath = `/tmp/polyscript_embedded_${Date.now()}.srt`;
+    const outPath = `/tmp/polyscript_embedded_${stableStringHash(videoPath)}_s${ffIndex}.srt`;
+    if (typeof (file == null ? void 0 : file.exists) === "function" && file.exists(outPath)) return outPath;
     const args = ["-y", "-i", videoPath, "-map", `0:s:${ffIndex}`, outPath];
-    const result = await utils.exec("ffmpeg", args, null, null, null);
+    const result = await utils.exec(ffmpegBin, args, null, null, null);
     if (result && result.status === 0 && file.exists(outPath)) {
       return outPath;
     }
     return null;
   }
   async function extractEmbeddedSubToSrtForTrack(track) {
-    if (!utils || typeof utils.fileInPath !== "function" || typeof utils.exec !== "function") {
+    if (!utils || typeof utils.exec !== "function") {
       return null;
     }
-    if (!utils.fileInPath("ffmpeg")) return null;
+    const ffmpegBin = resolveFfmpegBinary();
+    if (!ffmpegBin) return null;
     const videoPath = getVideoPath();
     const ffIndex = getEmbeddedSubTrackIndexForTrack(track);
     if (!videoPath || ffIndex == null) return null;
-    const outPath = `/tmp/polyscript_embedded_${Date.now()}_${ffIndex}.srt`;
+    const outPath = `/tmp/polyscript_embedded_${stableStringHash(videoPath)}_s${ffIndex}.srt`;
+    if (typeof (file == null ? void 0 : file.exists) === "function" && file.exists(outPath)) return outPath;
     const args = ["-y", "-i", videoPath, "-map", `0:s:${ffIndex}`, outPath];
-    const result = await utils.exec("ffmpeg", args, null, null, null);
+    const result = await utils.exec(ffmpegBin, args, null, null, null);
     if (result && result.status === 0 && file.exists(outPath)) {
       return outPath;
     }
     return null;
+  }
+  function stripAssOverrideTags(value) {
+    return String(value || "").replace(/\{\\[^}]*\}/g, "").replace(/\{an\d\}/gi, "").replace(/[ \t]{2,}/g, " ");
   }
   function parseSrt(text) {
     const blocks = text.replace(/\r/g, "").split(/\n\n+/);
@@ -8794,7 +8926,7 @@ Only output the transformed text, nothing else.`,
         startMs = toMs(timeMatch[1], timeMatch[2], timeMatch[3], timeMatch[4]);
         endMs = toMs(timeMatch[5], timeMatch[6], timeMatch[7], timeMatch[8]);
       }
-      const content = lines.slice(2).join("\n");
+      const content = stripAssOverrideTags(lines.slice(2).join("\n")).trim();
       entries.push({ index, time, content, startMs, endMs });
     }
     return entries;
