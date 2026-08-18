@@ -215,8 +215,26 @@
           if (markerSplit.length === expectedCount) return markerSplit;
           return exactSplit;
         }
-        function buildGoogleTranslateUrl(text, targetLang2) {
-          return `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang2 || "en")}&dt=t&dt=rm&q=${encodeURIComponent(String(text || ""))}`;
+        const GOOGLE_SOURCE_LANGS = {
+          zh: "zh-CN",
+          "zh-cn": "zh-CN",
+          "zh-hans": "zh-CN",
+          cmn: "zh-CN",
+          "zh-tw": "zh-TW",
+          "zh-hant": "zh-TW",
+          "zh-hk": "zh-TW",
+          yue: "zh-TW",
+          "zh-yue": "zh-TW"
+        };
+        function googleSourceLang(sourceLang) {
+          const tag = String(sourceLang || "").trim().toLowerCase().replace(/_/g, "-");
+          if (!tag || tag === "auto") return "auto";
+          if (GOOGLE_SOURCE_LANGS[tag]) return GOOGLE_SOURCE_LANGS[tag];
+          const base = tag.split("-")[0];
+          return GOOGLE_SOURCE_LANGS[base] || base || "auto";
+        }
+        function buildGoogleTranslateUrl(text, targetLang2, sourceLang) {
+          return `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(googleSourceLang(sourceLang))}&tl=${encodeURIComponent(targetLang2 || "en")}&dt=t&dt=rm&q=${encodeURIComponent(String(text || ""))}`;
         }
         function parseGoogleTranslatePayload(text) {
           try {
@@ -617,10 +635,9 @@
     }
   }
   function stopDeviceLoginFlow(options = {}) {
-    if (deviceLoginTimer) {
-      clearInterval(deviceLoginTimer);
-      deviceLoginTimer = null;
-    }
+    pumpDeviceLoginTask = null;
+    pumpDeviceLoginDueAt = 0;
+    deviceLoginTimer = null;
     deviceLoginPollInFlight = false;
     deviceLoginDeviceId = null;
     if (!options.keepVerificationUrl) {
@@ -1692,6 +1709,71 @@
     showedLineTranslateOsd = false;
     usingNativeTargetSubs = false;
   }
+  var MAIN_PUMP_INTERVAL_MS = 16;
+  var pumpRenderDueAt = 0;
+  var pumpTranslitSaveDueAt = 0;
+  var pumpDictRefreshDueAt = 0;
+  var pumpDeviceLoginDueAt = 0;
+  var pumpDeviceLoginIntervalMs = 0;
+  var pumpDeviceLoginTask = null;
+  var pumpSleepers = [];
+  function runMainPump() {
+    const now = Date.now();
+    if (pumpRenderDueAt && now >= pumpRenderDueAt) {
+      pumpRenderDueAt = 0;
+      try {
+        runPendingRender();
+      } catch (error) {
+        console.log(`POLYSCRIPT-WARN: pump render failed: ${String((error == null ? void 0 : error.message) || error)}`);
+      }
+    }
+    if (pumpDictRefreshDueAt && now >= pumpDictRefreshDueAt) {
+      pumpDictRefreshDueAt = 0;
+      try {
+        if (lastRenderedText && Date.now() - lastOverlayInteractionAt >= 320) {
+          scheduleRender(lastRenderedText);
+        }
+      } catch (_) {
+      }
+    }
+    if (pumpTranslitSaveDueAt && now >= pumpTranslitSaveDueAt) {
+      pumpTranslitSaveDueAt = 0;
+      try {
+        saveTranslitCachesNow();
+      } catch (_) {
+      }
+    }
+    if (pumpSleepers.length) {
+      for (let i = pumpSleepers.length - 1; i >= 0; i -= 1) {
+        if (now >= pumpSleepers[i].dueAt) {
+          const [sleeper] = pumpSleepers.splice(i, 1);
+          try {
+            sleeper.resolve();
+          } catch (_) {
+          }
+        }
+      }
+    }
+    if (pumpDeviceLoginTask && pumpDeviceLoginDueAt && now >= pumpDeviceLoginDueAt) {
+      pumpDeviceLoginDueAt = now + pumpDeviceLoginIntervalMs;
+      try {
+        pumpDeviceLoginTask();
+      } catch (_) {
+      }
+    }
+  }
+  setInterval(runMainPump, MAIN_PUMP_INTERVAL_MS);
+  function runPendingRender() {
+    renderScheduled = false;
+    const toRender = pendingRenderText;
+    const sourceText = pendingRenderSourceText;
+    const cueToken = pendingRenderCueToken;
+    pendingRenderText = null;
+    pendingRenderSourceText = "";
+    pendingRenderCueToken = "";
+    if (cueToken && cueToken !== subLastDisplayedCueToken) return;
+    if (toRender) renderSubtitleOverlay(toRender, sourceText, { cueToken });
+  }
   function scheduleRender(text, options = {}) {
     if (!text) return;
     const textString = String(text || "");
@@ -1701,17 +1783,7 @@
     if (renderScheduled) return;
     renderScheduled = true;
     const delayMs = hasExactSubtitleTimeline() ? 0 : 80;
-    setTimeout(() => {
-      renderScheduled = false;
-      const toRender = pendingRenderText;
-      const sourceText = pendingRenderSourceText;
-      const cueToken = pendingRenderCueToken;
-      pendingRenderText = null;
-      pendingRenderSourceText = "";
-      pendingRenderCueToken = "";
-      if (cueToken && cueToken !== subLastDisplayedCueToken) return;
-      if (toRender) renderSubtitleOverlay(toRender, sourceText, { cueToken });
-    }, delayMs);
+    pumpRenderDueAt = Date.now() + delayMs;
   }
   function scheduleDictionaryOverlayRefresh() {
     if (!lastRenderedText) return;
@@ -1721,11 +1793,7 @@
       scheduleRender(lastRenderedText);
       return;
     }
-    setTimeout(() => {
-      if (!lastRenderedText) return;
-      if (Date.now() - lastOverlayInteractionAt < 320) return;
-      scheduleRender(lastRenderedText);
-    }, 340 - elapsed);
+    pumpDictRefreshDueAt = now + (340 - elapsed);
   }
   function enqueueWordInfo(word) {
     const key = normalizeWord(word);
@@ -2174,7 +2242,9 @@
     return String(value || "").trim().replace("_", "-").toLowerCase();
   }
   function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolve) => {
+      pumpSleepers.push({ dueAt: Date.now() + Math.max(0, Number(ms) || 0), resolve });
+    });
   }
   function shellQuote(text) {
     if (text == null) return "''";
@@ -4873,7 +4943,10 @@ ws.onmessage = (event) => {
       });
       const started = Date.now();
       let lastExchangeAttemptAt = 0;
-      deviceLoginTimer = setInterval(async () => {
+      pumpDeviceLoginIntervalMs = 2500;
+      pumpDeviceLoginDueAt = Date.now() + 2500;
+      deviceLoginTimer = "pump";
+      pumpDeviceLoginTask = (async () => {
         if (!deviceLoginDeviceId || deviceLoginPollInFlight) return;
         deviceLoginPollInFlight = true;
         try {
@@ -4993,7 +5066,7 @@ ws.onmessage = (event) => {
         } finally {
           deviceLoginPollInFlight = false;
         }
-      }, 2500);
+      });
     } catch {
       stopDeviceLoginFlow();
       setAuthFlowState({ phase: "error", message: "Device login failed. Try again.", verificationUrl: "" });
@@ -6715,10 +6788,18 @@ ws.onmessage = (event) => {
     }
   }
   function scheduleTranslitCacheSave() {
-    if (translitCacheSaveTimer) clearTimeout(translitCacheSaveTimer);
-    translitCacheSaveTimer = setTimeout(saveTranslitCachesNow, 3e3);
+    pumpTranslitSaveDueAt = Date.now() + 3e3;
   }
   loadPersistedTranslitCaches();
+  function currentTransliterationLang() {
+    try {
+      const track = getSelectedSubTrack();
+      const lang = normalizeLangForSubtitleMatch((track == null ? void 0 : track.lang) || (track == null ? void 0 : track.language) || "");
+      return lang || "auto";
+    } catch (_) {
+      return "auto";
+    }
+  }
   async function fetchTransliterationBatch(texts) {
     const wanted = Array.from(new Set((texts || []).map((t) => String(t || "")).filter(Boolean))).filter((t) => !translitTokensCache.has(t) && !translitPending.has(t)).slice(0, 40);
     if (!wanted.length) return;
@@ -6729,7 +6810,7 @@ ws.onmessage = (event) => {
         const base = String(polyscriptBaseUrl || DEFAULT_POLYSCRIPT_BASE_URL).replace(/\/+$/, "");
         const resp = await authedPost(`${base}/api/transcript/transliterate`, {
           headers: { "Content-Type": "application/json" },
-          data: { texts: wanted, source_lang: "auto" }
+          data: { texts: wanted, source_lang: currentTransliterationLang() }
         });
         const json = (resp == null ? void 0 : resp.data) && typeof resp.data === "object" ? resp.data : null;
         if ((resp == null ? void 0 : resp.statusCode) >= 200 && (resp == null ? void 0 : resp.statusCode) < 300 && json) {
@@ -6751,7 +6832,7 @@ ws.onmessage = (event) => {
       }
       for (const text of wanted) {
         try {
-          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(DICT_LANG)}&dt=rm&q=${encodeURIComponent(text)}`;
+          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=rm&q=${encodeURIComponent(text)}`;
           const res = await safeHttpGet(url);
           const data = res.data;
           let translit = "";
@@ -7122,7 +7203,7 @@ ws.onmessage = (event) => {
     if (!shouldLookup(key)) return;
     dictPending.add(key);
     try {
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(DICT_LANG)}&dt=t&dt=rm&dt=md&dt=ex&q=${encodeURIComponent(key)}`;
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=t&dt=rm&dt=md&dt=ex&q=${encodeURIComponent(key)}`;
       const [translationResp, morphology] = await Promise.all([
         safeHttpGet(url),
         fetchMorphologyAssist(key)
