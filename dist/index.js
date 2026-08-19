@@ -1439,6 +1439,9 @@
       .ps-word ruby rt {
         font-size: ${preset.translit};
         color: #fbbf24;
+        /* The subtitle's own emphasis wraps the whole word, ruby included. The reading is ours,
+           not the author's, and italic romanisation at this size is hard to scan \u2014 opt it out. */
+        font-style: normal;
         font-weight: 500;
         opacity: 0.9;
         line-height: 1.1;
@@ -6696,7 +6699,7 @@ ws.onmessage = (event) => {
       for (let i = 0; i < entriesToTranslate.length; i += batchSize) {
         if (generation !== exactTimelineWindowGeneration) return false;
         const batch = entriesToTranslate.slice(i, i + batchSize);
-        const batchTexts = batch.map((entry) => String(entry.content || "").replace(/\n/g, " <|ps_line|> "));
+        const batchTexts = batch.map((entry) => stripSubtitleFormatting(entry.content).replace(/\n/g, " <|ps_line|> "));
         const translations = await translateBatch(batchTexts, effectiveTarget);
         if (generation !== exactTimelineWindowGeneration) return false;
         batch.forEach((entry, index) => {
@@ -6714,7 +6717,7 @@ ws.onmessage = (event) => {
           const scene = composeSubtitleScene({
             activeEntry,
             timeMs,
-            rawCurrentText: mpv.getString("sub-text") || "",
+            rawCurrentText: getLiveSubtitleText(),
             exactTimelineMode: true
           });
           if (scene.hasRenderableCue) {
@@ -7708,9 +7711,10 @@ Only output the transformed text, nothing else.`,
     const exactEntry = exactTimelineMode && (activeEntry == null ? void 0 : activeEntry.entry) ? activeEntry.entry : null;
     if (!exactEntry) {
       const currentText2 = String(rawCurrentText || "");
-      const secondaryState2 = getSecondarySubtitleState(currentText2, currentText2);
-      if (currentText2 && getSecondaryTargetLang()) {
-        ensureSecondarySubtitleTranslation(currentText2);
+      const plainCurrentText = stripSubtitleFormatting(currentText2);
+      const secondaryState2 = getSecondarySubtitleState(plainCurrentText, plainCurrentText);
+      if (plainCurrentText && getSecondaryTargetLang()) {
+        ensureSecondarySubtitleTranslation(plainCurrentText);
       }
       return {
         currentText: currentText2,
@@ -7718,11 +7722,11 @@ Only output the transformed text, nothing else.`,
         cueToken: buildSubtitleCueToken({
           exactTimelineMode: false,
           activeEntry,
-          currentText: currentText2,
-          sourceText: currentText2,
+          currentText: plainCurrentText,
+          sourceText: plainCurrentText,
           timeMs
         }),
-        hasRenderableCue: !!currentText2.trim() && isSecondarySubtitleSatisfied(secondaryState2)
+        hasRenderableCue: !!plainCurrentText.trim() && isSecondarySubtitleSatisfied(secondaryState2)
       };
     }
     const sourceText = getSynchronizedSourceSubtitleText({ activeEntry, timeMs }) || String(exactEntry.sourceContent || "").trim();
@@ -7762,27 +7766,27 @@ Only output the transformed text, nothing else.`,
     };
   }
   function renderSubtitleOverlay(rawText, sourceText = lastSourceOverlayText) {
-    const text = stripAssOverrideTags((rawText || "").replace(/\\n|\\N/g, "\n"));
-    const sourceLineText = getDistinctSecondarySubtitleText(
-      stripAssOverrideTags(String(sourceText || "").replace(/\\n|\\N/g, "\n")),
-      text
-    );
+    const formatted = parseInlineSubtitleFormatting((rawText || "").replace(/\\n|\\N/g, "\n"));
+    const text = formatted.text;
+    const sourceFormatted = parseInlineSubtitleFormatting(String(sourceText || "").replace(/\\n|\\N/g, "\n"));
+    const sourceLineText = getDistinctSecondarySubtitleText(sourceFormatted.text, text);
     if (hasSecondaryOverlayRequirement() && !sourceLineText) {
       return false;
     }
     lastRenderedText = text;
     lastRenderedSourceText = sourceLineText;
     lastRenderedCueToken = subLastDisplayedCueToken || "";
-    const sourceLineHtml = sourceLineText ? `<div class="ps-line ps-line-source">${escapeHtml(sourceLineText)}</div>` : "";
+    const sourceLineHtml = sourceLineText ? `<div class="ps-line ps-line-source">${sourceLineText === sourceFormatted.text ? formattedSubtitleToHtml(sourceFormatted) : escapeHtml(sourceLineText)}</div>` : "";
     const dismissAllPopupsJs = "document.querySelectorAll('.ps-word-container[data-open=true]').forEach((el)=>el.removeAttribute('data-open'));";
     const scheduleOpenJs = "const container=this.closest('.ps-word-container')||this.parentElement; if(!container)return; clearTimeout(container._psCloseTimer); clearTimeout(container._psHoverTimer); container._psHoverTimer=setTimeout(()=>{ container.setAttribute('data-open','true'); }, 190);";
     const keepOpenJs = "const container=this.closest('.ps-word-container')||this.parentElement; if(!container)return; clearTimeout(container._psCloseTimer); clearTimeout(container._psHoverTimer); container.setAttribute('data-open','true');";
     const scheduleCloseJs = "const container=this.closest('.ps-word-container')||this.parentElement; if(!container)return; clearTimeout(container._psHoverTimer); clearTimeout(container._psCloseTimer); container._psCloseTimer=setTimeout(()=>{ container.removeAttribute('data-open'); }, 900);";
     applySubtitleLayout();
-    const lines = text.split("\n");
+    const formattedLines = splitFormattedSubtitleLines(formatted);
     const wordsToTranslit = /* @__PURE__ */ new Set();
     const segmentsToTranslit = /* @__PURE__ */ new Set();
-    const htmlLines = lines.map((line) => {
+    const htmlLines = formattedLines.map(({ text: line, masks: lineMasks }) => {
+      let styleOffset = 0;
       const detectedSegLang = detectSegmentationLangForText(line);
       const segments = segmentText(
         line,
@@ -7791,9 +7795,12 @@ Only output the transformed text, nothing else.`,
       );
       const words = segments.map((seg) => {
         const segText = seg.text || "";
+        const segStart = styleOffset;
+        styleOffset += segText.length;
         if (!segText) return "";
+        const segMask = subtitleStyleMaskForRange(lineMasks, segStart, styleOffset);
         if (!seg.isWord || /^\s+$/.test(segText)) {
-          return escapeHtml(segText);
+          return wrapSubtitleStyleMask(escapeHtml(segText), segMask);
         }
         const key = normalizeWord(segText);
         const cachedTranslit = translitCache.get(key);
@@ -7809,7 +7816,7 @@ Only output the transformed text, nothing else.`,
         const tooltipHtml = buildTooltipHtml(key, segText);
         const tooltip = tooltipHtml ? `<div class="ps-tooltip" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onmouseup="event.stopPropagation();" onmouseenter="${keepOpenJs}" onmouseleave="${scheduleCloseJs}" onwheel="event.stopPropagation(); event.preventDefault(); this.scrollTop += event.deltaY;">${tooltipHtml}</div>` : "";
         const wordAttrs = `data-clickable data-word="${escapeHtml(segText)}" onclick="event.stopPropagation();" onmouseenter="${scheduleOpenJs} if (window.iina && window.iina.postMessage){window.iina.postMessage('ps:hover',{kind:'word',text:this.getAttribute('data-word')});} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iina){window.webkit.messageHandlers.iina.postMessage({name:'ps:hover',data:{kind:'word',text:this.getAttribute('data-word')}});} "`;
-        const wordInnerHtml = wordRubyHtml || escapeHtml(segText);
+        const wordInnerHtml = wrapSubtitleStyleMask(wordRubyHtml || escapeHtml(segText), segMask);
         return `<span class="ps-word-container" onmouseleave="${scheduleCloseJs}">${translitHtml}<span class="ps-word" ${wordAttrs}>${wordInnerHtml}</span>${tooltip}</span>`;
       }).join("");
       const lineSay = getSpeakableText(line);
@@ -7902,7 +7909,7 @@ Only output the transformed text, nothing else.`,
       if (!getSelectedSubTrack()) {
         maybeAutoSelectSourceSubtitleTrack("poll");
       }
-      const rawCurrentText = mpv.getString("sub-text") || "";
+      const rawCurrentText = getLiveSubtitleText();
       const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
       const isPaused = typeof mpv.getFlag === "function" ? mpv.getFlag("pause") : false;
       const tMs = typeof timePos === "number" ? timePos * 1e3 : null;
@@ -8988,6 +8995,133 @@ Only output the transformed text, nothing else.`,
   }
   function stripAssOverrideTags(value) {
     return String(value || "").replace(/\{\\[^}]*\}/g, "").replace(/\{an\d\}/gi, "").replace(/[ \t]{2,}/g, " ");
+  }
+  var PS_STYLE_ITALIC = 1;
+  var PS_STYLE_BOLD = 2;
+  var PS_STYLE_UNDERLINE = 4;
+  var PS_STYLE_BITS = [PS_STYLE_ITALIC, PS_STYLE_BOLD, PS_STYLE_UNDERLINE];
+  function subtitleStyleBitFor(name) {
+    const key = String(name || "").toLowerCase();
+    if (key === "i" || key === "em") return PS_STYLE_ITALIC;
+    if (key === "b" || key === "strong") return PS_STYLE_BOLD;
+    if (key === "u") return PS_STYLE_UNDERLINE;
+    return 0;
+  }
+  var PS_SUBTITLE_TAG_RE = /\{\\([ibu])([01])\}|<\s*(\/?)\s*(i|b|u|em|strong|font)\b[^>]*>|<\s*br\s*\/?\s*>|\{\\[^}]*\}|\{an\d\}/gi;
+  function parseInlineSubtitleFormatting(value) {
+    const raw = String(value || "");
+    let text = "";
+    const masks = [];
+    let mask = 0;
+    const depth = new Map(PS_STYLE_BITS.map((bit) => [bit, 0]));
+    const applyDepth = () => {
+      mask = 0;
+      for (const bit of PS_STYLE_BITS) {
+        if (depth.get(bit) > 0) mask |= bit;
+      }
+    };
+    const push = (chunk) => {
+      for (let i = 0; i < chunk.length; i += 1) {
+        text += chunk[i];
+        masks.push(mask);
+      }
+    };
+    let cursor = 0;
+    let match;
+    PS_SUBTITLE_TAG_RE.lastIndex = 0;
+    while (match = PS_SUBTITLE_TAG_RE.exec(raw)) {
+      push(raw.slice(cursor, match.index));
+      cursor = match.index + match[0].length;
+      if (match[1]) {
+        const bit = subtitleStyleBitFor(match[1]);
+        if (bit) {
+          depth.set(bit, match[2] === "1" ? depth.get(bit) + 1 : 0);
+          applyDepth();
+        }
+        continue;
+      }
+      if (match[4]) {
+        const bit = subtitleStyleBitFor(match[4]);
+        if (!bit) continue;
+        depth.set(bit, match[3] ? Math.max(0, depth.get(bit) - 1) : depth.get(bit) + 1);
+        applyDepth();
+        continue;
+      }
+      if (/^<\s*br/i.test(match[0])) {
+        push("\n");
+        continue;
+      }
+    }
+    push(raw.slice(cursor));
+    for (let i = text.length - 1; i > 0; i -= 1) {
+      if (/[ \t]/.test(text[i]) && /[ \t]/.test(text[i - 1])) {
+        text = text.slice(0, i) + text.slice(i + 1);
+        masks.splice(i, 1);
+      }
+    }
+    return { text, masks };
+  }
+  function stripSubtitleFormatting(value) {
+    return parseInlineSubtitleFormatting(value).text;
+  }
+  function getLiveSubtitleText() {
+    if (typeof mpv.getString !== "function") return "";
+    const plain = mpv.getString("sub-text") || "";
+    for (const property of ["sub-text/ass", "sub-text-ass"]) {
+      let withTags = "";
+      try {
+        withTags = mpv.getString(property) || "";
+      } catch {
+        continue;
+      }
+      if (!withTags) continue;
+      const strippedForCompare = stripSubtitleFormatting(withTags.replace(/\\n|\\N/g, "\n"));
+      if (normalizeSubtitleComparisonText(strippedForCompare) === normalizeSubtitleComparisonText(plain)) {
+        return withTags;
+      }
+    }
+    return plain;
+  }
+  function splitFormattedSubtitleLines(formatted) {
+    const text = String((formatted == null ? void 0 : formatted.text) || "");
+    const masks = Array.isArray(formatted == null ? void 0 : formatted.masks) ? formatted.masks : [];
+    const lines = [];
+    let start = 0;
+    for (let i = 0; i <= text.length; i += 1) {
+      if (i === text.length || text[i] === "\n") {
+        lines.push({ text: text.slice(start, i), masks: masks.slice(start, i) });
+        start = i + 1;
+      }
+    }
+    return lines;
+  }
+  function wrapSubtitleStyleMask(html, mask) {
+    let out = String(html || "");
+    if (mask & PS_STYLE_UNDERLINE) out = `<u>${out}</u>`;
+    if (mask & PS_STYLE_BOLD) out = `<b>${out}</b>`;
+    if (mask & PS_STYLE_ITALIC) out = `<i>${out}</i>`;
+    return out;
+  }
+  function formattedSubtitleToHtml(formatted) {
+    const text = String((formatted == null ? void 0 : formatted.text) || "");
+    const masks = Array.isArray(formatted == null ? void 0 : formatted.masks) ? formatted.masks : [];
+    let html = "";
+    let runStart = 0;
+    const maskAt = (index) => Number(masks[index]) || 0;
+    for (let i = 1; i <= text.length; i += 1) {
+      if (i === text.length || maskAt(i) !== maskAt(runStart)) {
+        html += wrapSubtitleStyleMask(escapeHtml(text.slice(runStart, i)), maskAt(runStart));
+        runStart = i;
+      }
+    }
+    return html;
+  }
+  function subtitleStyleMaskForRange(masks, start, end) {
+    for (let i = start; i < end && i < masks.length; i += 1) {
+      const mask = Number(masks[i]) || 0;
+      if (mask) return mask;
+    }
+    return 0;
   }
   function parseSrt(text) {
     const blocks = text.replace(/\r/g, "").split(/\n\n+/);
