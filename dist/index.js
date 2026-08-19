@@ -1033,6 +1033,9 @@
   var DICT_LANG = "en";
   var OVERLAY_PLACEMENTS = {
     auto: "Auto (Avoid Overlap)",
+    //: Full screen letterboxes a wide film, and the black bar under the picture is the natural home
+    //: for subtitles — off the image entirely. "Normal" sits 60px up, which lands them back on it.
+    lowered: "Lowered (into letterbox)",
     normal: "Normal",
     raised: "Raised",
     high: "High",
@@ -1377,7 +1380,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
+        gap: 2px;
         text-align: center;
         font: ${preset.primary} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: ${settings.textColor};
@@ -1389,8 +1392,8 @@
         display: block;
         width: fit-content;
         background: rgba(${settings.bgColor}, ${settings.bgOpacity});
-        padding: 4px 8px;
-        margin: 2px auto;
+        padding: 3px 8px;
+        margin: 1px auto;
         border-radius: 4px;
         pointer-events: auto;
         cursor: pointer;
@@ -1873,14 +1876,18 @@
   function getOverlayBottomPx() {
     const settings = getAppearanceSettings();
     const base = 60;
+    if (settings.placement === "lowered") return -28;
     if (settings.placement === "normal") return base;
     if (settings.placement === "raised") return 120;
     if (settings.placement === "high") return 180;
     if (settings.placement === "custom") {
-      return Math.max(0, Math.min(400, settings.customOffset));
+      return Math.max(-60, Math.min(400, settings.customOffset));
     }
     if (autoArrangeSubsSetting) {
       return base;
+    }
+    if (lastNativeSubtitleSuppressionMode !== "none") {
+      return -14;
     }
     if (shouldHideNativeSubtitleRendering() || shouldUseTransparentPrimarySuppression()) {
       return base;
@@ -2138,7 +2145,48 @@
   function shouldUseTransparentPrimarySuppression() {
     return polyscriptEnabled && overlayLoaded && hideNativeSubtitleRendering && (hasExactSubtitleTimeline() || usingNativeTargetSubs && !(subtitleEntries == null ? void 0 : subtitleEntries.length) || !usingNativeTargetSubs && !usingFullFileTranslation);
   }
+  function selectedSubtitleIsAssStyled() {
+    try {
+      const track = getSelectedSubTrack();
+      const codec = String((track == null ? void 0 : track.codec) || "").toLowerCase();
+      return codec.includes("ass") || codec.includes("ssa");
+    } catch (_) {
+      return false;
+    }
+  }
+  function wantsNativeSubtitleSuppression() {
+    return hasExactSubtitleTimeline() && overlayLoaded && hideNativeSubtitleRendering || shouldHideNativeSubtitleRendering() || shouldUseTransparentPrimarySuppression();
+  }
+  var __lastSuppressionResyncAt = 0;
+  var __suppressionSettled = false;
+  function resetSuppressionResync() {
+    __suppressionSettled = false;
+    __lastSuppressionResyncAt = 0;
+  }
+  function maybeResyncNativeSubtitleVisibility() {
+    if (__suppressionSettled) return;
+    const now = Date.now();
+    if (now - __lastSuppressionResyncAt < 1500) return;
+    __lastSuppressionResyncAt = now;
+    try {
+      syncNativeSubtitleVisibility();
+      if (lastNativeSubtitleSuppressionMode !== "none") __suppressionSettled = true;
+    } catch (_) {
+    }
+  }
   function syncNativeSubtitleVisibility() {
+    if (selectedSubtitleIsAssStyled() && hasExactSubtitleTimeline() && wantsNativeSubtitleSuppression()) {
+      if (lastNativeSubtitleSuppressionMode !== "visibility-ass") {
+        console.log("POLYSCRIPT: Native subtitle suppression mode=visibility-ass");
+        lastNativeSubtitleSuppressionMode = "visibility-ass";
+      }
+      restorePrimarySubStyle();
+      captureSubVisibility();
+      safeSetBoolean("sub-visibility", false);
+      safeSetBoolean("secondary-sub-visibility", false);
+      syncSourceSubtitleTrack();
+      return;
+    }
     if (hasExactSubtitleTimeline() && overlayLoaded && hideNativeSubtitleRendering) {
       if (lastNativeSubtitleSuppressionMode !== "transparent-primary-exact") {
         console.log("POLYSCRIPT: Native subtitle suppression mode=transparent-primary-exact");
@@ -7909,6 +7957,7 @@ Only output the transformed text, nothing else.`,
       if (!getSelectedSubTrack()) {
         maybeAutoSelectSourceSubtitleTrack("poll");
       }
+      maybeResyncNativeSubtitleVisibility();
       const rawCurrentText = getLiveSubtitleText();
       const timePos = typeof mpv.getNumber === "function" ? mpv.getNumber("time-pos") : null;
       const isPaused = typeof mpv.getFlag === "function" ? mpv.getFlag("pause") : false;
@@ -8682,7 +8731,11 @@ Only output the transformed text, nothing else.`,
         });
         clearAutoSelectSourceSubtitleRetry();
         lastNativeSubId = selected.id;
+        lastSourceSubId = selected.id;
         sourceTrackAutoSelectedForFile = true;
+        if (!(Array.isArray(subtitleEntries) && subtitleEntries.length)) {
+          primeSubtitleEntriesForSelectedTrack("auto-source-existing", { autoSourceTrackId: selected.id });
+        }
         return false;
       }
     }
@@ -8916,6 +8969,7 @@ Only output the transformed text, nothing else.`,
     return Array.isArray(subtitleEntries) && subtitleEntries.length > 0 && subtitleEntries.some((entry) => hasTimedSubtitleEntry(entry)) && !sentenceLiveMode;
   }
   function clearSubtitleEntriesState() {
+    resetSuppressionResync();
     subtitleEntries = null;
     sourceSubtitleEntries = null;
     subtitleEntriesSourceKey = "";
@@ -8957,6 +9011,31 @@ Only output the transformed text, nothing else.`,
     }
     return null;
   }
+  var CONVERTIBLE_SUBTITLE_EXTENSIONS = [".ass", ".ssa", ".vtt", ".sub", ".sbv", ".smi"];
+  function isConvertibleSubtitlePath(path) {
+    const lower = String(path || "").toLowerCase();
+    return CONVERTIBLE_SUBTITLE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+  }
+  async function convertExternalSubtitleToSrt(sourcePath) {
+    if (!utils || typeof utils.exec !== "function") return null;
+    const ffmpegBin = resolveFfmpegBinary();
+    if (!ffmpegBin) return null;
+    const source = String(sourcePath || "").trim();
+    if (!source) return null;
+    const outPath = `/tmp/polyscript_external_${stableStringHash(source)}.srt`;
+    try {
+      if (typeof (file == null ? void 0 : file.exists) === "function" && file.exists(outPath)) return outPath;
+      const result = await utils.exec(ffmpegBin, ["-y", "-i", source, outPath], null, null, null);
+      if (result && result.status === 0 && file.exists(outPath)) {
+        console.log(`POLYSCRIPT: converted subtitle ${source} -> ${outPath}`);
+        return outPath;
+      }
+      console.log(`POLYSCRIPT-WARN: could not convert subtitle ${source}`);
+    } catch (error) {
+      console.log(`POLYSCRIPT-WARN: subtitle conversion failed: ${String((error == null ? void 0 : error.message) || error)}`);
+    }
+    return null;
+  }
   async function extractEmbeddedSubToSrt() {
     if (!utils || typeof utils.exec !== "function") {
       return null;
@@ -8992,6 +9071,9 @@ Only output the transformed text, nothing else.`,
       return outPath;
     }
     return null;
+  }
+  function stripUnrenderedSubtitleTags(value) {
+    return String(value || "").replace(/<\/?font\b[^>]*>/gi, "").replace(/[ \t]{2,}/g, " ");
   }
   function stripAssOverrideTags(value) {
     return String(value || "").replace(/\{\\[^}]*\}/g, "").replace(/\{an\d\}/gi, "").replace(/[ \t]{2,}/g, " ");
@@ -9066,21 +9148,7 @@ Only output the transformed text, nothing else.`,
   }
   function getLiveSubtitleText() {
     if (typeof mpv.getString !== "function") return "";
-    const plain = mpv.getString("sub-text") || "";
-    for (const property of ["sub-text/ass", "sub-text-ass"]) {
-      let withTags = "";
-      try {
-        withTags = mpv.getString(property) || "";
-      } catch {
-        continue;
-      }
-      if (!withTags) continue;
-      const strippedForCompare = stripSubtitleFormatting(withTags.replace(/\\n|\\N/g, "\n"));
-      if (normalizeSubtitleComparisonText(strippedForCompare) === normalizeSubtitleComparisonText(plain)) {
-        return withTags;
-      }
-    }
-    return plain;
+    return mpv.getString("sub-text") || "";
   }
   function splitFormattedSubtitleLines(formatted) {
     const text = String((formatted == null ? void 0 : formatted.text) || "");
@@ -9141,7 +9209,9 @@ Only output the transformed text, nothing else.`,
         startMs = toMs(timeMatch[1], timeMatch[2], timeMatch[3], timeMatch[4]);
         endMs = toMs(timeMatch[5], timeMatch[6], timeMatch[7], timeMatch[8]);
       }
-      const content = stripAssOverrideTags(lines.slice(2).join("\n")).trim();
+      const content = stripUnrenderedSubtitleTags(
+        stripAssOverrideTags(lines.slice(2).join("\n"))
+      ).trim();
       entries.push({ index, time, content, startMs, endMs });
     }
     return entries;
@@ -9185,7 +9255,7 @@ Only output the transformed text, nothing else.`,
     clearSubtitleEntriesState();
     let path = getSubtitleFilePath();
     if (path && !path.toLowerCase().endsWith(".srt")) {
-      path = null;
+      path = isConvertibleSubtitlePath(path) ? await convertExternalSubtitleToSrt(path) : null;
     }
     if (!path) {
       path = await extractEmbeddedSubToSrt();
@@ -9253,7 +9323,7 @@ Only output the transformed text, nothing else.`,
     }
     let path = getSubtitleFilePathForTrack(sourceTrack);
     if (path && !path.toLowerCase().endsWith(".srt")) {
-      path = null;
+      path = isConvertibleSubtitlePath(path) ? await convertExternalSubtitleToSrt(path) : null;
     }
     if (!path) {
       path = await extractEmbeddedSubToSrtForTrack(sourceTrack);
@@ -9411,8 +9481,8 @@ ${e.content}
     const jobId = ++currentTranslateJobId;
     let path = getSubtitleFilePath();
     if (path && !path.toLowerCase().endsWith(".srt")) {
-      console.log(`POLYSCRIPT: Subtitle file is not SRT, skipping: ${path}`);
-      path = null;
+      path = isConvertibleSubtitlePath(path) ? await convertExternalSubtitleToSrt(path) : null;
+      if (!path) console.log("POLYSCRIPT: subtitle file is not SRT and could not be converted");
     }
     if (!path) {
       const embeddedPath = await extractEmbeddedSubToSrt();

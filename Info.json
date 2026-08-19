@@ -1,9 +1,9 @@
 {
   "name": "Polyscript",
   "identifier": "app.polyscript.iina-plugin",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "ghRepo": "polyscript-app/polyplugin-release",
-  "ghVersion": 15,
+  "ghVersion": 16,
   "description": "Dual subtitles with hover dictionary, AI translation, and language learning features for IINA",
   "author": {
     "name": "Polyscript",
