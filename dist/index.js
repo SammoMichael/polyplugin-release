@@ -9,29 +9,66 @@
     "src/generated/language-tables.js"(exports, module) {
       (function initPolyscriptLanguageTables(global) {
         const GOOGLE_TRANSLATE_LANGS2 = {
+          // Audited against translate_a/single itself rather than a published list: every code
+          // here was verified to return a real translation from the endpoint Polyscript calls.
+          // Legacy duplicates are deliberately absent — 'iw' is Hebrew, already listed as 'he',
+          // and 'jv' is Javanese, already listed as 'jw'; carrying both would offer the same
+          // language twice under two names.
+          aa: "Afar",
+          ab: "Abkhaz",
+          ace: "Acehnese",
+          ach: "Acholi",
           af: "Afrikaans",
           ak: "Twi",
+          alz: "Alur",
           am: "Amharic",
           ar: "Arabic",
           as: "Assamese",
+          av: "Avar",
+          awa: "Awadhi",
           ay: "Aymara",
           az: "Azerbaijani",
+          ba: "Bashkir",
+          bal: "Balochi",
+          ban: "Balinese",
+          bbc: "Batak Toba",
+          bci: "Baoul\xE9",
           be: "Belarusian",
+          bem: "Bemba",
+          bew: "Betawi",
           bg: "Bulgarian",
           bho: "Bhojpuri",
+          bik: "Bikol",
           bm: "Bambara",
           bn: "Bengali",
+          bo: "Tibetan",
+          br: "Breton",
           bs: "Bosnian",
+          bts: "Batak Simalungun",
+          btx: "Batak Karo",
+          bua: "Buryat",
           ca: "Catalan",
           ceb: "Cebuano",
+          cgg: "Kiga",
+          ch: "Chamorro",
+          chk: "Chuukese",
+          chm: "Meadow Mari",
           ckb: "Kurdish (Sorani)",
+          cnh: "Hakha Chin",
           co: "Corsican",
+          crh: "Crimean Tatar",
+          crs: "Seychellois Creole",
           cs: "Czech",
+          cv: "Chuvash",
           cy: "Welsh",
           da: "Danish",
           de: "German",
+          din: "Dinka",
           doi: "Dogri",
+          dov: "Dombe",
           dv: "Dhivehi",
+          dyu: "Dyula",
+          dz: "Dzongkha",
           ee: "Ewe",
           el: "Greek",
           en: "English",
@@ -40,49 +77,80 @@
           et: "Estonian",
           eu: "Basque",
           fa: "Persian",
+          "fa-AF": "Dari",
+          ff: "Fulfulde",
           fi: "Finnish",
           fil: "Filipino",
+          fj: "Fijian",
+          fo: "Faroese",
+          fon: "Fon",
           fr: "French",
+          "fr-CA": "French (Canada)",
+          fur: "Friulian",
           fy: "Frisian",
           ga: "Irish",
+          gaa: "Ga",
           gd: "Scots Gaelic",
           gl: "Galician",
           gn: "Guarani",
           gom: "Konkani",
           gu: "Gujarati",
+          gv: "Manx",
           ha: "Hausa",
           haw: "Hawaiian",
           he: "Hebrew",
           hi: "Hindi",
+          hil: "Hiligaynon",
           hmn: "Hmong",
           hr: "Croatian",
+          hrx: "Hunsrik",
           ht: "Haitian Creole",
           hu: "Hungarian",
           hy: "Armenian",
+          iba: "Iban",
           id: "Indonesian",
           ig: "Igbo",
+          ilo: "Ilocano",
           is: "Icelandic",
           it: "Italian",
           ja: "Japanese",
+          jam: "Jamaican Patois",
           jw: "Javanese",
           ka: "Georgian",
+          kac: "Jingpo",
+          kek: "Q'eqchi'",
+          kg: "Kikongo",
+          kha: "Khasi",
           kk: "Kazakh",
           km: "Khmer",
           kn: "Kannada",
           ko: "Korean",
+          kr: "Kanuri",
           kri: "Krio",
+          ktu: "Kituba",
           ku: "Kurdish",
+          kv: "Komi",
           ky: "Kyrgyz",
           la: "Latin",
           lb: "Luxembourgish",
           lg: "Luganda",
+          li: "Limburgish",
+          lij: "Ligurian",
+          lmo: "Lombard",
           ln: "Lingala",
           lo: "Lao",
           lt: "Lithuanian",
+          ltg: "Latgalian",
+          lua: "Luba-Kasai",
+          luo: "Luo",
           lus: "Mizo",
           lv: "Latvian",
+          mad: "Madurese",
           mai: "Maithili",
+          mak: "Makassar",
+          mfe: "Mauritian Creole",
           mg: "Malagasy",
+          mh: "Marshallese",
           mi: "Maori",
           mk: "Macedonian",
           ml: "Malayalam",
@@ -90,25 +158,46 @@
           "mni-Mtei": "Meiteilon (Manipuri)",
           mr: "Marathi",
           ms: "Malay",
+          "ms-Arab": "Malay (Jawi)",
           mt: "Maltese",
+          mwr: "Marwadi",
           my: "Myanmar (Burmese)",
+          "ndc-ZW": "Ndau",
           ne: "Nepali",
+          new: "Nepalbhasa (Newari)",
           nl: "Dutch",
           no: "Norwegian",
+          nr: "Southern Ndebele",
           nso: "Sepedi",
+          nus: "Nuer",
           ny: "Nyanja (Chichewa)",
+          oc: "Occitan",
           om: "Oromo",
           or: "Odia (Oriya)",
+          os: "Ossetian",
           pa: "Punjabi",
+          "pa-Arab": "Punjabi (Shahmukhi)",
+          pag: "Pangasinan",
+          pam: "Kapampangan",
+          pap: "Papiamento",
           pl: "Polish",
           ps: "Pashto",
           pt: "Portuguese",
+          "pt-PT": "Portuguese (Portugal)",
           qu: "Quechua",
+          rn: "Rundi",
           ro: "Romanian",
+          rom: "Romani",
           ru: "Russian",
           rw: "Kinyarwanda",
           sa: "Sanskrit",
+          sah: "Yakut",
+          sat: "Santali",
+          scn: "Sicilian",
           sd: "Sindhi",
+          se: "Northern Sami",
+          sg: "Sango",
+          shn: "Shan",
           si: "Sinhala",
           sk: "Slovak",
           sl: "Slovenian",
@@ -117,28 +206,49 @@
           so: "Somali",
           sq: "Albanian",
           sr: "Serbian",
+          ss: "Swati",
           st: "Sesotho",
           su: "Sundanese",
+          sus: "Susu",
           sv: "Swedish",
           sw: "Swahili",
+          szl: "Silesian",
           ta: "Tamil",
+          tcy: "Tulu",
           te: "Telugu",
+          tet: "Tetum",
           tg: "Tajik",
           th: "Thai",
           ti: "Tigrinya",
+          tiv: "Tiv",
           tk: "Turkmen",
           tl: "Tagalog (Filipino)",
+          tn: "Tswana",
+          to: "Tongan",
+          tpi: "Tok Pisin",
           tr: "Turkish",
+          trp: "Kokborok",
           ts: "Tsonga",
           tt: "Tatar",
+          tum: "Tumbuka",
+          ty: "Tahitian",
+          tyv: "Tuvan",
+          udm: "Udmurt",
           ug: "Uyghur",
           uk: "Ukrainian",
           ur: "Urdu",
           uz: "Uzbek",
+          ve: "Venda",
+          vec: "Venetian",
           vi: "Vietnamese",
+          war: "Waray",
+          wo: "Wolof",
           xh: "Xhosa",
           yi: "Yiddish",
           yo: "Yoruba",
+          yua: "Yucatec Maya",
+          yue: "Cantonese",
+          zap: "Zapotec",
           "zh-CN": "Chinese (Simplified)",
           "zh-TW": "Chinese (Traditional)",
           zu: "Zulu"
@@ -202,15 +312,20 @@
         }
         function sanitizeTranslatedText(text) {
           return trim(
-            String(text || "").replace(/<\s*[|!/iIlL]?\s*polyscript-[^>\n]{0,120}>?/gi, " ").replace(/\|\s*polyscript-[^\s<>{}[\]]+/gi, " ").replace(/\s{2,}/g, " ")
+            String(text || "").replace(/<\s*[|!/iIlL]?\s*polyscript-[^>\n]{0,120}>?/gi, " ").replace(/\|\s*polyscript-[^\s<>{}[\]]+/gi, " ").replace(/[⟪《【\[]?\s*(?:§\s*)*P\s*S\s*9\s*9\s*9\s*9\s*1\s*(?:§\s*)*[⟫》】\]]?/gi, " ").replace(/\s{2,}/g, " ")
           );
+        }
+        function whitespaceTolerantMarker(marker) {
+          const pattern = String(marker || "").trim().split("").map((character) => character.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+          return pattern ? new RegExp(pattern, "g") : null;
         }
         function splitBulkTranslationByMarkers(combinedTranslation, separator, expectedCount) {
           const source = String(combinedTranslation || "");
           if (!source) return [];
           const exactSplit = source.split(separator).map((part) => sanitizeTranslatedText(part));
           if (exactSplit.length === expectedCount) return exactSplit;
-          const markerNormalized = source.replace(/<\s*[|!/iIlL]?\s*polyscript-[^>\n]{0,120}>?/gi, separator).replace(/\|\s*polyscript-[^\s<>{}[\]]+/gi, separator);
+          const spaced = whitespaceTolerantMarker(separator);
+          const markerNormalized = source.replace(spaced || /$^/g, separator).replace(/<\s*[|!/iIlL]?\s*polyscript-[^>\n]{0,120}>?/gi, separator).replace(/\|\s*polyscript-[^\s<>{}[\]]+/gi, separator);
           const markerSplit = markerNormalized.split(separator).map((part) => sanitizeTranslatedText(part)).filter((part) => part.length > 0);
           if (markerSplit.length === expectedCount) return markerSplit;
           return exactSplit;
@@ -307,6 +422,539 @@
     }
   });
 
+  // node_modules/koroman/src/koroman.core.js
+  var CHO = [
+    "\u1100",
+    "\u1101",
+    "\u1102",
+    "\u1103",
+    "\u1104",
+    "\u1105",
+    "\u1106",
+    "\u1107",
+    "\u1108",
+    "\u1109",
+    "\u110A",
+    "\u110B",
+    "\u110C",
+    "\u110D",
+    "\u110E",
+    "\u110F",
+    "\u1110",
+    "\u1111",
+    "\u1112"
+  ];
+  var JUNG = [
+    "\u1161",
+    "\u1162",
+    "\u1163",
+    "\u1164",
+    "\u1165",
+    "\u1166",
+    "\u1167",
+    "\u1168",
+    "\u1169",
+    "\u116A",
+    "\u116B",
+    "\u116C",
+    "\u116D",
+    "\u116E",
+    "\u116F",
+    "\u1170",
+    "\u1171",
+    "\u1172",
+    "\u1173",
+    "\u1174",
+    "\u1175"
+  ];
+  var JONG = [
+    "",
+    "\u11A8",
+    "\u11A9",
+    "\u11AA",
+    "\u11AB",
+    "\u11AC",
+    "\u11AD",
+    "\u11AE",
+    "\u11AF",
+    "\u11B0",
+    "\u11B1",
+    "\u11B2",
+    "\u11B3",
+    "\u11B4",
+    "\u11B5",
+    "\u11B6",
+    "\u11B7",
+    "\u11B8",
+    "\u11B9",
+    "\u11BA",
+    "\u11BB",
+    "\u11BC",
+    "\u11BD",
+    "\u11BE",
+    "\u11BF",
+    "\u11C0",
+    "\u11C1",
+    "\u11C2"
+  ];
+  var ZWSP = "\u200A";
+  var CASING_ALIASES = {
+    "lowercase": "lowercase",
+    "lower": "lowercase",
+    "l": "lowercase",
+    "lc": "lowercase",
+    "0": "lowercase",
+    "uppercase": "uppercase",
+    "upper": "uppercase",
+    "u": "uppercase",
+    "uc": "uppercase",
+    "1": "uppercase",
+    "capitalize-line": "capitalize-line",
+    "cap-line": "capitalize-line",
+    "cline": "capitalize-line",
+    "cl": "capitalize-line",
+    "2": "capitalize-line",
+    "capitalize-word": "capitalize-word",
+    "cap-word": "capitalize-word",
+    "cword": "capitalize-word",
+    "cw": "capitalize-word",
+    "3": "capitalize-word"
+  };
+  function normalizeCasingOption(opt) {
+    var _a5;
+    if (opt === null || opt === void 0) return "lowercase";
+    const key = String(opt).toLowerCase();
+    return (_a5 = CASING_ALIASES[key]) != null ? _a5 : "lowercase";
+  }
+  function formatRoman(str, casingOption = "lowercase") {
+    switch (normalizeCasingOption(casingOption)) {
+      case "uppercase":
+        return str.toUpperCase();
+      case "capitalize-line":
+        return str.split("\n").map((line) => line.length > 0 ? line.charAt(0).toUpperCase() + line.slice(1) : "").join("\n");
+      case "capitalize-word":
+        return str.split("\n").map((line) => line.split(" ").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")).join("\n");
+      default:
+        return str.toLowerCase();
+    }
+  }
+  function splitHangulToJamos(str) {
+    const result = [];
+    let jamoString = "";
+    let plainJamoString = "";
+    for (let char of str) {
+      const code = char.charCodeAt(0);
+      if (code < 44032 || code > 55203) {
+        result.push({ char, type: "non-hangul" });
+        jamoString += char;
+        plainJamoString += char;
+        continue;
+      }
+      const syllableIndex = code - 44032;
+      const cho = Math.floor(syllableIndex / (21 * 28));
+      const jung = Math.floor(syllableIndex % (21 * 28) / 28);
+      const jong = syllableIndex % 28;
+      const jamo = { \uCD08\uC131: CHO[cho], \uC911\uC131: JUNG[jung], \uC885\uC131: JONG[jong] || null };
+      result.push(jamo);
+      jamoString += jamo.\uCD08\uC131 + jamo.\uC911\uC131 + (jamo.\uC885\uC131 || "");
+      plainJamoString += jamo.\uCD08\uC131 + ZWSP + jamo.\uC911\uC131;
+      if (jamo.\uC885\uC131) plainJamoString += ZWSP + jamo.\uC885\uC131;
+    }
+    return { jamoArray: result, jamoString, plainJamoString };
+  }
+  var N_INSERTION_TRIGGERS = /* @__PURE__ */ new Set(["\uC78E"]);
+  function hangulSyllableIndices(ch) {
+    const n = ch.charCodeAt(0) - 44032;
+    return {
+      cho: Math.floor(n / (21 * 28)),
+      jung: Math.floor(n % (21 * 28) / 28),
+      jong: n % 28
+    };
+  }
+  function composeHangulSyllable(cho, jung, jong = 0) {
+    return String.fromCharCode(44032 + (cho * 21 + jung) * 28 + jong);
+  }
+  function applyNInsertionTriggers(text) {
+    return text.replace(/[\uAC00-\uD7A3]+/g, (word) => {
+      const chars = [...word];
+      if (chars.length < 2) return word;
+      const last = chars[chars.length - 1];
+      if (!N_INSERTION_TRIGGERS.has(last)) return word;
+      const prev = chars[chars.length - 2];
+      const prevParts = hangulSyllableIndices(prev);
+      if (prevParts.jong === 0) return word;
+      const lastParts = hangulSyllableIndices(last);
+      if (lastParts.cho !== 11) return word;
+      const nip = composeHangulSyllable(2, lastParts.jung, lastParts.jong);
+      return chars.slice(0, -1).join("") + nip;
+    });
+  }
+  function applyPronunciationRules(jamoStr) {
+    const replaceArr = [
+      // ==============================
+      // 1. 무효화 처리
+      // ==============================
+      { p: /\u11a7/g, r: "" },
+      // 'ᆧ'(U+11A7) → 제거 (사용되지 않는 종성)
+      // ==============================
+      // 2. 비음화 (ㄴ, ㅁ, ㅇ)
+      // ==============================
+      { p: /[\u11b8\u11c1\u11b9\u11b2\u11b5](?=[\u1102\u1106])/g, r: "\u11B7" },
+      // 종성 'ᆸ(ㅂ)' 'ᇁ(ㅍ)' 'ᆹ(ㅂㅅ)' 'ᆲ(ㄹㅂ)' 'ᆵ(ㄹㅍ)' + 다음 초성 'ᄂ(ㄴ)' or 'ᄆ(ㅁ)' → 'ᆷ'
+      { p: /[\u11ae\u11c0\u11bd\u11be\u11ba\u11bb\u11c2](?=[\u1102\u1106])/g, r: "\u11AB" },
+      // 종성 'ᆮ(ㄷ)' 'ᇀ(ㅌ)' 'ᆽ(ㅈ)' 'ᆾ(ㅊ)' 'ᆺ(ㅅ)' 'ᆻ(ㅆ)' 'ᇂ(ㅎ)' + 다음 초성 'ᄂ(ㄴ)' or 'ᄆ(ㅁ)' → 'ᆫ'
+      { p: /[\u11a8\u11a9\u11bf\u11aa\u11b0](?=[\u1102\u1106])/g, r: "\u11BC" },
+      // 종성 'ᆨ(ㄱ)' 'ᆩ(ㄲ)' 'ᆿ(ㅋ)' 'ᆪ(ㄱㅅ)' 'ᆰ(ㄹㄱ)' + 다음 초성 'ᄂ'/'ᄆ' → 'ᆼ'
+      // ==============================
+      // 3. 연음/연철
+      // ==============================
+      { p: /\u11a8\u110b(?=[\u1163\u1164\u1167\u1168\u116d\u1172])/g, r: "\u11BC\u1102" },
+      // 'ᆨ' + 'ᄋ' + 중성 'ㅑㅒㅕㅖㅛㅠ' → 'ᆼᄂ' (연음화)
+      { p: /\u11af\u110b(?=[\u1163\u1164\u1167\u1168\u116d\u1172])/g, r: "\u11AF\u1105" },
+      // 'ᆯ' + 'ᄋ' + 중성 위와 같음 → 'ᆯᄅ'
+      { p: /[\u11a8\u11bc]\u1105/g, r: "\u11BC\u1102" },
+      // 'ᆨ(ㄱ)', 'ᆼ(ㅇ)' + 'ᄅ(ㄹ)' → 'ᆼᄂ'
+      { p: /\u11ab\u1105(?=\u1169)/g, r: "\u11AB\u1102" },
+      // 'ᆫ(ㄴ)' + 'ᄅ' + 중성 'ㅗ' → 'ᆫᄂ'
+      { p: /\u11af\u1102|\u11ab\u1105/g, r: "\u11AF\u1105" },
+      // 'ᆯ(ㄹ)' + 'ᄂ(ㄴ)', 'ᆫ(ㄴ)' + 'ᄅ(ㄹ)' → 'ᆯᄅ'
+      { p: /[\u11b7\u11b8]\u1105/g, r: "\u11B7\u1102" },
+      // 'ᆷ(ㅁ)', 'ᆸ(ㅂ)' + 'ᄅ' → 'ᆷᄂ'
+      { p: /\u11b0\u1105/g, r: "\u11A8\u1105" },
+      // 'ᆰ(ㄹㄱ)' + 'ᄅ' → 'ᆨᄅ'
+      // ==============================
+      // 4. 격음화 / 자음군 분해
+      // ==============================
+      { p: /\u11a8\u110f/g, r: "\u11A8-\u110F" },
+      // 'ᆨ' + 'ᄏ' → 'ᆨ-ᄏ'
+      { p: /\u11b8\u1111/g, r: "\u11B8-\u1111" },
+      // 'ᆸ' + 'ᄑ' → 'ᆸ-ᄑ'
+      { p: /\u11ae\u1110/g, r: "\u11AE-\u1110" },
+      // 'ᆮ' + 'ᄐ' → 'ᆮ-ᄐ'
+      // ==============================
+      // 5. 복합 종성(자음군) + 'ᄋ' 모음 연음 처리 (표준발음법 14항)
+      //    뒤 자음만 다음 음절 초성으로 옮겨감. 분해보다 먼저 적용해야
+      //    이중종성 dedup 규칙으로 자음이 잘못 사라지지 않는다.
+      //    예: 닭이[달기] → ᆰᄋ → ᆯᄀ → "dalgi"
+      //        잃어[이러] → ᆶᄋ → ᆯᄋ → 후속 연음으로 ᄅ → "ireo"
+      //    (된소리는 표기에 반영하지 않음 — 넋이[넉씨] → "neoksi")
+      // ==============================
+      { p: /\u11aa\u110b/g, r: "\u11A8\u1109" },
+      // ᆪ + 'ᄋ' → ᆨ + 'ᄉ' (넋이 → 넉시)
+      { p: /\u11ac\u110b/g, r: "\u11AB\u110C" },
+      // ᆬ + 'ᄋ' → ᆫ + 'ᄌ' (앉아 → 안자)
+      { p: /\u11ad\u110b/g, r: "\u11AB\u110B" },
+      // ᆭ + 'ᄋ' → ᆫ + 'ᄋ' (ㅎ만 탈락; 일관성)
+      { p: /\u11b0\u110b/g, r: "\u11AF\u1100" },
+      // ᆰ + 'ᄋ' → ᆯ + 'ᄀ' (닭이 → 달기)
+      { p: /\u11b1\u110b/g, r: "\u11AF\u1106" },
+      // ᆱ + 'ᄋ' → ᆯ + 'ᄆ' (삶이 → 살미)
+      { p: /\u11b2\u110b/g, r: "\u11AF\u1107" },
+      // ᆲ + 'ᄋ' → ᆯ + 'ᄇ' (밟아 → 발바)
+      { p: /\u11b3\u110b/g, r: "\u11AF\u1109" },
+      // ᆳ + 'ᄋ' → ᆯ + 'ᄉ' (곬이 → 골시)
+      { p: /\u11b4\u110b/g, r: "\u11AF\u1110" },
+      // ᆴ + 'ᄋ' → ᆯ + 'ᄐ' (핥아 → 할타)
+      { p: /\u11b5\u110b/g, r: "\u11AF\u1111" },
+      // ᆵ + 'ᄋ' → ᆯ + 'ᄑ' (읊어 → 을퍼)
+      { p: /\u11b6\u110b/g, r: "\u11AF\u110B" },
+      // ᆶ + 'ᄋ' → ᆯ + 'ᄋ' (잃어 → 이러; ㅎ만 탈락)
+      { p: /\u11b9\u110b/g, r: "\u11B8\u1109" },
+      // ᆹ + 'ᄋ' → ᆸ + 'ᄉ' (값이 → 갑시)
+      // ==============================
+      // 5b. 밟- 어간 예외 (표준발음법 제10항 예외)
+      //    'ㄼ' 받침은 일반적으로 [ㄹ]로 발음되지만, '밟-' 어간은 자음 앞에서 [ㅂ]로 발음.
+      //    예: 밟다[밥따] → bapda, 밟지[밥찌] → bapji, 밟고[밥꼬] → bapgo, 밟는[밤는] → bamneun (비음화 우선)
+      //    위 5번 규칙으로 'ᆲ+ᄋ' (밟아) 케이스는 이미 처리됨.
+      // ==============================
+      { p: /\u1107\u1161\u11b2(?=[\u1100-\u110A\u110C-\u1112])/g, r: "\u1107\u1161\u11B8" },
+      // ==============================
+      // 6. 복합 종성 분해 (자음군 단순화)
+      //    분해 순서: 받침 위치에서 [표준 발음법상 남는 자음]을 첫 자모로 둠.
+      //    뒤이은 이중종성 dedup 규칙으로 두 번째 자모가 떨어져 나가도록 함.
+      //    (예: 흙[흑] → ᆨᆯ → ᆨ, 삶[삼] → ᆷᆯ → ᆷ, 읊[읍] → ᇁᆯ → ᇁ)
+      // ==============================
+      { p: /\u11aa/g, r: "\u11A8\u11BA" },
+      // 'ᆪ(ㄱㅅ)' → [ㄱ] 우세
+      { p: /\u11ac/g, r: "\u11AB\u11BD" },
+      // 'ᆬ(ㄴㅈ)' → [ㄴ] 우세
+      { p: /\u11ad/g, r: "\u11AB\u11C2" },
+      // 'ᆭ(ㄴㅎ)' → [ㄴ] 우세
+      { p: /\u11b0/g, r: "\u11A8\u11AF" },
+      // 'ᆰ(ㄹㄱ)' → [ㄱ] 우세 (예: 흙→heuk)
+      { p: /\u11b1/g, r: "\u11B7\u11AF" },
+      // 'ᆱ(ㄹㅁ)' → [ㅁ] 우세 (예: 삶→sam)
+      { p: /\u11b2/g, r: "\u11AF\u11B8" },
+      // 'ᆲ(ㄹㅂ)' → [ㄹ] 우세 (밟- 예외 [ㅂ]는 형태소 정보 필요)
+      { p: /\u11b3/g, r: "\u11AF\u11BA" },
+      // 'ᆳ(ㄹㅅ)' → [ㄹ] 우세
+      { p: /\u11b4/g, r: "\u11AF\u11C0" },
+      // 'ᆴ(ㄹㅌ)' → [ㄹ] 우세
+      { p: /\u11b5/g, r: "\u11C1\u11AF" },
+      // 'ᆵ(ㄹㅍ)' → [ㅂ] 우세 (예: 읊→eup)
+      { p: /\u11b6/g, r: "\u11AF\u11C2" },
+      // 'ᆶ(ㄹㅎ)' → [ㄹ] 우세 (모음 앞은 위 5단계에서 선처리)
+      { p: /\u11b9/g, r: "\u11B8\u11BA" },
+      // 'ᆹ(ㅂㅅ)' → [ㅂ] 우세
+      // ==============================
+      // 7. 구개음화 (ㄷ/ㅌ + ᄋㅣ → 지/치) + ㄷ+ㅎ+ㅣ → 치 (격음화+구개음화 통합)
+      // ==============================
+      { p: /\u11ae\u110b\u1175/g, r: "\u110C\u1175" },
+      // 'ᆮ' + 'ᄋ' + 'ᅵ' → '지'
+      { p: /\u11c0\u110b\u1175/g, r: "\u110E\u1175" },
+      // 'ᇀ' + 'ᄋ' + 'ᅵ' → '치'
+      // ==============================
+      // 7b. ㄷ + ㅎ + ㅣ → 치 (받침 ㄷ + 초성 ㅎ + 중성 ㅣ: 격음화 결과인 ㅌ가 다시 구개음화)
+      //     예: 굳히다 → 구치다, 닫히다 → 다치다
+      { p: /\u11ae\u1112\u1175/g, r: "\u110E\u1175" },
+      // ==============================
+      // 8. 연음 / 이음자 제거 (받침 + ᄋ)
+      // ==============================
+      { p: /\u11a8\u110b/g, r: "\u1100" },
+      // 'ᆨ' + 'ᄋ' → 'ᄀ'
+      { p: /\u11a9\u110b/g, r: "\u1101" },
+      // 'ᆩ' + 'ᄋ' → 'ᄁ'
+      { p: /\u11ae\u110b/g, r: "\u1103" },
+      // 'ᆮ' + 'ᄋ' → 'ᄃ'
+      { p: /\u11af\u110b/g, r: "\u1105" },
+      // 'ᆯ' + 'ᄋ' → 'ᄅ'
+      { p: /\u11b8\u110b/g, r: "\u1107" },
+      // 'ᆸ' + 'ᄋ' → 'ᄇ'
+      { p: /\u11ba\u110b/g, r: "\u1109" },
+      // 'ᆺ' + 'ᄋ' → 'ᄉ'
+      { p: /\u11bb\u110b/g, r: "\u110A" },
+      // 'ᆻ' + 'ᄋ' → 'ᄊ'
+      { p: /\u11bd\u110b/g, r: "\u110C" },
+      // 'ᆽ' + 'ᄋ' → 'ᄌ'
+      { p: /\u11be\u110b/g, r: "\u110E" },
+      // 'ᆾ' + 'ᄋ' → 'ᄎ'
+      { p: /\u11c2\u110b/g, r: "" },
+      // 'ᇂ' + 'ᄋ' → 제거
+      // ==============================
+      // 9. 거센소리되기 (Aspiration) — ROMANIZE_RULE 4 기본 정책
+      //    체언 예외(묵호→Mukho, 집현전→Jiphyeonjeon)는 형태소 분석 없이는 분리 불가하므로
+      //    일관되게 단일 격음(k/t/p/ch)으로 처리. 표준 발음 결과 기준.
+      // ==============================
+      { p: /\u11c2\u1100|\u11a8\u1112/g, r: "\u110F" },
+      // 'ᇂ'+'ᄀ' or 'ᆨ'+'ᄒ' → 'ᄏ' (좋고→joko)
+      { p: /\u11c2\u1103|\u11ae\u1112/g, r: "\u1110" },
+      // 'ᇂ'+'ᄃ' or 'ᆮ'+'ᄒ' → 'ᄐ' (놓다→nota)
+      { p: /\u11c2\u110c|\u11bd\u1112/g, r: "\u110E" },
+      // 'ᇂ'+'ᄌ' or 'ᆽ'+'ᄒ' → 'ᄎ' (낳지→nachi, 맞히다→machida)
+      { p: /\u11c2\u1107/g, r: "\u1107" },
+      // 'ᇂ'+'ᄇ' → 'ᄇ'
+      { p: /\u11b8\u1112/g, r: "\u1111" },
+      // 'ᆸ'+'ᄒ' → 'ᄑ' (잡혀→japyeo)
+      // ==============================
+      // 10. 특수 처리 및 최종 정리
+      // ==============================
+      { p: /\u11af\u1105/g, r: "ll" },
+      // 'ᆯ' + 'ᄅ' → ll
+      { p: /\u11c2(?!\s|$)/g, r: "" },
+      // 'ᇂ' (종성) 단독 → 제거
+      { p: /([\u11a8-\u11c2])([\u11a8-\u11c2])/g, r: "$1" }
+      // 이중 종성 제거 (자음군 단순화 마무리)
+    ];
+    for (const { p, r } of replaceArr) {
+      jamoStr = jamoStr.replace(p, r);
+    }
+    return jamoStr;
+  }
+  var ROMAN_MAP_STD = {
+    "\u1100": "g",
+    "\u1101": "kk",
+    "\u1102": "n",
+    "\u1103": "d",
+    "\u1104": "tt",
+    "\u1105": "r",
+    "\u1106": "m",
+    "\u1107": "b",
+    "\u1108": "pp",
+    "\u1109": "s",
+    "\u110A": "ss",
+    "\u110B": "",
+    "\u110C": "j",
+    "\u110D": "jj",
+    "\u110E": "ch",
+    "\u110F": "k",
+    "\u1110": "t",
+    "\u1111": "p",
+    "\u1112": "h",
+    "\u1161": "a",
+    "\u1162": "ae",
+    "\u1163": "ya",
+    "\u1164": "yae",
+    "\u1165": "eo",
+    "\u1166": "e",
+    "\u1167": "yeo",
+    "\u1168": "ye",
+    "\u1169": "o",
+    "\u116A": "wa",
+    "\u116B": "wae",
+    "\u116C": "oe",
+    "\u116D": "yo",
+    "\u116E": "u",
+    "\u116F": "wo",
+    "\u1170": "we",
+    "\u1171": "wi",
+    "\u1172": "yu",
+    "\u1173": "eu",
+    "\u1174": "ui",
+    "\u1175": "i",
+    "\u11A8": "k",
+    "\u11A9": "k",
+    "\u11AA": "k",
+    "\u11AB": "n",
+    "\u11AC": "n",
+    "\u11AD": "n",
+    "\u11AE": "t",
+    "\u11AF": "l",
+    "\u11B0": "k",
+    "\u11B1": "m",
+    "\u11B2": "p",
+    "\u11B3": "t",
+    "\u11B4": "t",
+    "\u11B5": "p",
+    "\u11B6": "l",
+    "\u11B7": "m",
+    "\u11B8": "p",
+    "\u11B9": "p",
+    "\u11BA": "t",
+    "\u11BB": "t",
+    "\u11BC": "ng",
+    "\u11BD": "t",
+    "\u11BE": "t",
+    "\u11BF": "k",
+    "\u11C0": "t",
+    "\u11C1": "p",
+    "\u11C2": "t"
+  };
+  var ROMAN_MAP_LITERAL = {
+    ...ROMAN_MAP_STD,
+    "\u11AE": "d",
+    "\u11C2": "h"
+  };
+  function applyRomanMapping(jamoStr, map = ROMAN_MAP_STD) {
+    return [...jamoStr].map((ch) => {
+      var _a5;
+      return (_a5 = map[ch]) != null ? _a5 : ch;
+    }).join("");
+  }
+  var CHO_RANGE = [4352, 4370];
+  var JUNG_RANGE = [4449, 4469];
+  var JONG_RANGE = [4520, 4546];
+  function inRange(code, [lo, hi]) {
+    return code >= lo && code <= hi;
+  }
+  function regroupJamosToSyllables(jamoStr) {
+    const groups = [];
+    let i = 0;
+    while (i < jamoStr.length) {
+      const ch = jamoStr[i];
+      const code = ch.charCodeAt(0);
+      if (inRange(code, CHO_RANGE) && i + 1 < jamoStr.length && inRange(jamoStr.charCodeAt(i + 1), JUNG_RANGE)) {
+        const cho = ch;
+        const jung = jamoStr[i + 1];
+        let jong = "";
+        let step = 2;
+        if (i + 2 < jamoStr.length && inRange(jamoStr.charCodeAt(i + 2), JONG_RANGE)) {
+          jong = jamoStr[i + 2];
+          step = 3;
+        }
+        groups.push({ type: "syllable", cho, jung, jong });
+        i += step;
+        continue;
+      }
+      groups.push({ type: "other", char: ch });
+      i++;
+    }
+    return groups;
+  }
+  function romanizeGroup(g, map) {
+    var _a5, _b, _c, _d;
+    if (g.type === "syllable") {
+      return ((_a5 = map[g.cho]) != null ? _a5 : "") + ((_b = map[g.jung]) != null ? _b : "") + (g.jong ? (_c = map[g.jong]) != null ? _c : "" : "");
+    }
+    return (_d = map[g.char]) != null ? _d : g.char;
+  }
+  function needsHyphen(prev, cur) {
+    if (!prev || !cur || prev.type !== "syllable" || cur.type !== "syllable") return false;
+    const prevJong = prev.jong;
+    const curCho = cur.cho;
+    if (prevJong === "\u11BC" && curCho === "\u110B") return true;
+    if (prevJong === "\u11AB" && curCho === "\u1100") return true;
+    if (!prevJong && curCho === "\u110B") return true;
+    return false;
+  }
+  function applyRomanMappingWithHyphen(jamoStr, map = ROMAN_MAP_STD) {
+    const groups = regroupJamosToSyllables(jamoStr);
+    let out = "";
+    for (let i = 0; i < groups.length; i++) {
+      const cur = groups[i];
+      if (i > 0 && needsHyphen(groups[i - 1], cur)) {
+        if (!out.endsWith("-")) out += "-";
+      }
+      out += romanizeGroup(cur, map);
+    }
+    return out;
+  }
+  var DICT_MARK = "";
+  var DICT_PATTERN = /\u0001(\d+)\u0001/g;
+  var _customDictionaryStore = {};
+  function _isPlainObject(v) {
+    return v !== null && typeof v === "object" && !Array.isArray(v);
+  }
+  function applyCustomDictionary(text, dict) {
+    if (!dict) return { text, values: [] };
+    const keys = Object.keys(dict).filter((k) => k && k.length > 0).sort((a, b) => b.length - a.length);
+    if (keys.length === 0) return { text, values: [] };
+    const values = [];
+    for (const key of keys) {
+      const value = dict[key];
+      let pos = 0;
+      while (true) {
+        const idx = text.indexOf(key, pos);
+        if (idx === -1) break;
+        const placeholder = `${DICT_MARK}${values.length}${DICT_MARK}`;
+        values.push(value);
+        text = text.slice(0, idx) + placeholder + text.slice(idx + key.length);
+        pos = idx + placeholder.length;
+      }
+    }
+    return { text, values };
+  }
+  function restoreCustomDictionary(text, values) {
+    if (!values || values.length === 0) return text;
+    return text.replace(DICT_PATTERN, (_, n) => {
+      const i = parseInt(n, 10);
+      return i >= 0 && i < values.length ? values[i] : "";
+    });
+  }
+  function _resolveEffectiveDictionary(useCustomDictionary, customDictionary) {
+    const internal = useCustomDictionary ? _customDictionaryStore : null;
+    if (!internal && !_isPlainObject(customDictionary)) return null;
+    const out = internal ? { ...internal } : {};
+    if (_isPlainObject(customDictionary)) Object.assign(out, customDictionary);
+    return out;
+  }
+  function romanize(str, {
+    usePronunciationRules = true,
+    casingOption = "lowercase",
+    useHyphen = false,
+    useCustomDictionary = true,
+    customDictionary
+  } = {}) {
+    const effectiveDict = _resolveEffectiveDictionary(useCustomDictionary, customDictionary);
+    const { text: prepped, values } = applyCustomDictionary(str, effectiveDict);
+    const textForJamo = usePronunciationRules ? applyNInsertionTriggers(prepped) : prepped;
+    const { jamoString } = splitHangulToJamos(textForJamo);
+    const replaced = usePronunciationRules ? applyPronunciationRules(jamoString) : jamoString;
+    const map = usePronunciationRules ? ROMAN_MAP_STD : ROMAN_MAP_LITERAL;
+    const romanized = useHyphen ? applyRomanMappingWithHyphen(replaced, map) : applyRomanMapping(replaced, map);
+    const cased = formatRoman(romanized, casingOption);
+    return restoreCustomDictionary(cased, values);
+  }
+
   // src/index.js
   var {
     core,
@@ -327,7 +975,12 @@
   var pendingAutoSpeakSerial = 0;
   var lastAutoSpokenSerial = 0;
   var overlayLoaded = false;
+  var iinaWindowLoaded = false;
   var translatingFile = false;
+  var googleTranslationCooldownUntil = 0;
+  var GOOGLE_TRANSLATION_COOLDOWN_MS = 2 * 60 * 1e3;
+  var retranslateWhenFree = false;
+  var llmEmptyTranslations = 0;
   var lastRenderedText = "";
   var lastOriginalText = "";
   var lastOriginalCueToken = "";
@@ -402,7 +1055,7 @@
   var FILE_TIMELINE_SUBTITLE_POLL_MS = 8;
   var FILE_TIMELINE_SENTENCE_PAUSE_LEAD_MS = 120;
   var LIVE_SUBTITLE_POLL_MS = 100;
-  var PREPARED_SUBTITLE_LLM_CONCURRENCY = 2;
+  var PREPARED_SUBTITLE_LLM_CONCURRENCY = 4;
   var TRANSCRIPT_TIME_POLL_MS = 120;
   var TRANSCRIPT_TIME_EMIT_GRANULARITY_MS = 90;
   function contentAwareMinDisplay(text) {
@@ -416,6 +1069,26 @@
       hash = (hash << 5) + hash ^ input.charCodeAt(i);
     }
     return (hash >>> 0).toString(36);
+  }
+  function preparedTranslationIsUntranslated(cachedEntries, sourceEntries) {
+    var _a5, _b;
+    const compared = Math.min(cachedEntries.length, sourceEntries.length);
+    if (compared < 8) return false;
+    let identical = 0;
+    let counted = 0;
+    for (let index = 0; index < compared; index += 1) {
+      const cached = String(((_a5 = cachedEntries[index]) == null ? void 0 : _a5.content) || "").trim();
+      const source = String(((_b = sourceEntries[index]) == null ? void 0 : _b.content) || "").trim();
+      if (source.length < 12) continue;
+      counted += 1;
+      if (cached === source) identical += 1;
+    }
+    return counted >= 8 && identical / counted > 0.8;
+  }
+  function preparedTranslationLooksCorrupt(text) {
+    const raw = String(text || "");
+    if (!raw) return false;
+    return /<\s*\|\s*p\s*s\s*_\s*l\s*i\s*n\s*e\s*\|\s*>/i.test(raw) || /P\s*S\s*9\s*9\s*9\s*9\s*1/i.test(raw);
   }
   function buildPreparedSubtitleCachePath(sourceKey) {
     return `/tmp/polyscript_prepared_${hashString(sourceKey)}.srt`;
@@ -1830,6 +2503,13 @@
       scheduleRender(lastRenderedText);
     }
   }
+  function llmSignInWarningFor(language) {
+    const name = String(language || "").trim();
+    if (!name) return "";
+    if (polyscriptToken) return "";
+    if (!shouldUseLlmTranslation(name)) return "";
+    return ` \u2014 needs Sign In (Google cannot translate ${getLangLabel(name) || name})`;
+  }
   function setTargetLang(code, options = {}) {
     var _a5;
     if (!GOOGLE_TRANSLATE_LANGS[code]) return;
@@ -1850,7 +2530,11 @@
     subtitleEntries = null;
     lastSentenceIndex = -1;
     currentTranslateJobId += 1;
-    core.osd(`POLYSCRIPT: Primary subtitle language set to ${getLangLabel(code)}`, 2e3);
+    const signInWarning = llmSignInWarningFor(code);
+    core.osd(
+      `POLYSCRIPT: Primary subtitle language set to ${getLangLabel(code)}${signInWarning}`,
+      signInWarning ? 5e3 : 2e3
+    );
     translateCurrentSubtitleFile();
     buildMenu();
   }
@@ -1867,11 +2551,14 @@
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
     clearTranslationCaches();
     usingFullFileTranslation = false;
+    usingNativeTargetSubs = false;
     subtitleEntries = null;
     lastSentenceIndex = -1;
     currentTranslateJobId += 1;
     translateCurrentSubtitleFile();
-    core.osd(`POLYSCRIPT: LLM Target set to ${llmCustomTarget || targetLang}`, 2e3);
+    const target = llmCustomTarget || targetLang;
+    const signInWarning = llmSignInWarningFor(target);
+    core.osd(`POLYSCRIPT: LLM Target set to ${target}${signInWarning}`, signInWarning ? 5e3 : 2e3);
   }
   function getOverlayBottomPx() {
     const settings = getAppearanceSettings();
@@ -2058,8 +2745,8 @@
     try {
       const desiredId = id == null || id === "no" ? null : Number(id);
       try {
-        if (core == null ? void 0 : core.subtitle) {
-          core.subtitle.secondID = Number.isFinite(desiredId) ? desiredId : null;
+        if ((core == null ? void 0 : core.subtitle) && Number.isFinite(desiredId)) {
+          core.subtitle.secondID = desiredId;
         }
       } catch {
       }
@@ -3006,9 +3693,17 @@
     (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
   }
   function setPolyscriptToken(token) {
-    var _a5;
+    var _a5, _b;
+    const previous = polyscriptToken;
     polyscriptToken = String(token || "").trim();
     (_a5 = preferences == null ? void 0 : preferences.set) == null ? void 0 : _a5.call(preferences, "polyscriptToken", polyscriptToken);
+    if (previous !== polyscriptToken) {
+      try {
+        (_b = preferences == null ? void 0 : preferences.sync) == null ? void 0 : _b.call(preferences);
+      } catch (error) {
+        console.log(`POLYSCRIPT-WARN: Could not persist sign-in: ${String((error == null ? void 0 : error.message) || error)}`);
+      }
+    }
     if (polyscriptToken) {
       stopDeviceLoginFlow();
     }
@@ -3738,156 +4433,149 @@
       return false;
     }
   }
-  async function playCloudAudioFile(audioPath) {
-    if (!(utils == null ? void 0 : utils.exec)) return false;
-    const cleanPath = String(audioPath || "").trim();
-    if (!cleanPath) return false;
-    try {
-      await utils.exec("/bin/sh", [
-        "-c",
-        `(/usr/bin/killall afplay || true); /usr/bin/afplay ${shellQuote(cleanPath)} >/dev/null 2>&1 & (/bin/sleep 45; /bin/rm -f ${shellQuote(cleanPath)} >/dev/null 2>&1) &`
-      ]);
-      return true;
-    } catch {
-      try {
-        await utils.exec("/bin/rm", ["-f", cleanPath]);
-      } catch {
-      }
-      return false;
-    }
-  }
+  var activeCloudPcmBridgePidPath = "";
   function buildCloudNodeBridgeScript() {
     return String.raw`const fs = require("fs");
+const { spawn } = require("child_process");
 const inputPath = process.argv[2];
-if (!inputPath) {
-  console.error("missing_input");
-  process.exit(1);
-}
+if (!inputPath) process.exit(1);
 const input = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 const payload = input.payload || {};
-const token = String(input.token || "").trim();
-const baseUrl = String(input.baseUrl || "").trim().replace(/\/+$/, "");
-const wavPath = String(input.wavPath || "").trim();
-if (!token || !baseUrl || !wavPath) {
-  console.error("missing_parameters");
-  process.exit(1);
-}
-const wsUrl = baseUrl.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:") + "/api/synthesis/stream/ws?token=" + encodeURIComponent(token);
-const pcmChunks = [];
+const wsUrls = Array.isArray(input.wsUrls) ? input.wsUrls.filter(Boolean) : [];
+const statusPath = String(input.statusPath || "");
+const pidPath = String(input.pidPath || "");
+if (!wsUrls.length || !statusPath || !pidPath) process.exit(1);
+
 let sampleRate = Number(payload.sample_rate || 24000);
 let settled = false;
-const timeout = setTimeout(() => fail("timeout"), 30000);
+let started = false;
+let mpv = null;
+let ws = null;
+const startedAt = Date.now();
+// A scale-to-zero GPU takes ~40-50s to wake and load the model, so a 30s
+// budget guaranteed that the first cloud voice after an idle period always
+// failed -- and worse, left its job running to block the next request.
+const timeout = setTimeout(() => fail("timeout"), 120000);
+fs.writeFileSync(pidPath, String(process.pid));
 
+function writeStatus(value) {
+  try { fs.writeFileSync(statusPath, JSON.stringify(value)); } catch {}
+}
+function cleanup() {
+  clearTimeout(timeout);
+  try { fs.unlinkSync(pidPath); } catch {}
+  try { fs.unlinkSync(inputPath); } catch {}
+}
 function fail(message) {
   if (settled) return;
   settled = true;
-  clearTimeout(timeout);
-  console.error(String(message || "unknown_error"));
+  writeStatus({ ok: false, error: String(message || "unknown_error") });
+  try { ws?.close(); } catch {}
+  try { mpv?.stdin?.end(); } catch {}
+  cleanup();
   process.exit(1);
 }
-
-function wavFromPcm16(chunks, rate, channels = 1) {
-  const dataSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const out = Buffer.alloc(44 + dataSize);
-  let offset = 0;
-  const writeAscii = (value) => {
-    out.write(value, offset, "ascii");
-    offset += value.length;
-  };
-  writeAscii("RIFF");
-  out.writeUInt32LE(36 + dataSize, offset); offset += 4;
-  writeAscii("WAVE");
-  writeAscii("fmt ");
-  out.writeUInt32LE(16, offset); offset += 4;
-  out.writeUInt16LE(1, offset); offset += 2;
-  out.writeUInt16LE(channels, offset); offset += 2;
-  out.writeUInt32LE(rate, offset); offset += 4;
-  out.writeUInt32LE(rate * channels * 2, offset); offset += 4;
-  out.writeUInt16LE(channels * 2, offset); offset += 2;
-  out.writeUInt16LE(16, offset); offset += 2;
-  writeAscii("data");
-  out.writeUInt32LE(dataSize, offset); offset += 4;
-  for (const chunk of chunks) {
-    chunk.copy(out, offset);
-    offset += chunk.length;
-  }
-  return out;
+function startMpv() {
+  if (mpv) return;
+  // Raw signed 16-bit little-endian PCM from the backend. mpv starts before
+  // the first write, so audio can begin as soon as this first frame arrives.
+  mpv = spawn(process.env.POLYSCRIPT_MPV || "mpv", [
+    "--no-config", "--no-video", "--no-terminal", "--really-quiet",
+    "--demuxer=rawaudio", "--demuxer-rawaudio-format=s16le",
+    // mpv calls this "rate", not "samplerate". The wrong spelling is a fatal
+    // option error, so mpv exited before playing a single frame and cloud
+    // voices failed on every machine with a stock mpv.
+    "--demuxer-rawaudio-channels=1", "--demuxer-rawaudio-rate=" + sampleRate,
+    "-",
+  ], { stdio: ["pipe", "ignore", "ignore"] });
+  mpv.on("error", (error) => fail("mpv_" + (error.message || error)));
+  mpv.on("exit", (code) => {
+    if (!settled && code && code !== 0) fail("mpv_exit_" + code);
+  });
 }
-
-const ws = new WebSocket(wsUrl);
-ws.onerror = (event) => {
-  fail(event?.message || "websocket_error");
-};
-ws.onclose = (event) => {
-  if (!settled) {
-    fail("closed_" + (event?.code || "unknown"));
-  }
-};
-ws.onmessage = (event) => {
-  let data = null;
-  try {
-    data = JSON.parse(String(event.data || ""));
-  } catch (error) {
-    fail("json_" + (error.message || error));
-    return;
-  }
-  const type = String(data?.type || "").toLowerCase();
-  if (type === "connection.ready") {
-    ws.send(JSON.stringify({ type: "session.start", payload }));
-    return;
-  }
-  if (type === "session.started") {
-    const nextRate = Number(data?.sample_rate || 0);
-    if (Number.isFinite(nextRate) && nextRate > 0) sampleRate = nextRate;
-    return;
-  }
-  if (type === "audio.chunk") {
-    const chunk = String(data?.payload_b64 || "");
-    if (chunk) pcmChunks.push(Buffer.from(chunk, "base64"));
-    return;
-  }
-  if (type === "session.error") {
-    fail(data?.error || "session_error");
-    return;
-  }
-  if (type === "session.completed") {
-    if (settled) return;
-    settled = true;
-    clearTimeout(timeout);
-    try {
-      const wav = wavFromPcm16(pcmChunks, sampleRate, 1);
-      fs.writeFileSync(wavPath, wav);
-      process.stdout.write(JSON.stringify({ ok: true, wavPath, chunks: pcmChunks.length }));
-      process.exit(0);
-    } catch (error) {
-      fail("write_" + (error.message || error));
+function connect(index) {
+  if (index >= wsUrls.length) return fail("all_websocket_candidates_failed");
+  try { ws = new WebSocket(wsUrls[index]); }
+  catch (error) { connect(index + 1); return; }
+  ws.onerror = () => {
+    if (!started) connect(index + 1);
+    else fail("websocket_error");
+  };
+  ws.onclose = (event) => {
+    if (!settled && !started) connect(index + 1);
+    else if (!settled) fail("closed_" + (event?.code || "unknown"));
+  };
+  ws.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(String(event.data || "")); }
+    catch (error) { fail("json_" + (error.message || error)); return; }
+    const type = String(data?.type || "").toLowerCase();
+    if (type === "connection.ready") { ws.send(JSON.stringify({ type: "session.start", payload })); return; }
+    if (type === "session.started") {
+      const nextRate = Number(data?.sample_rate || 0);
+      if (Number.isFinite(nextRate) && nextRate > 0) sampleRate = nextRate;
+      return;
     }
+    if (type === "audio.chunk") {
+      const pcm = Buffer.from(String(data?.payload_b64 || ""), "base64");
+      if (!pcm.length) return;
+      startMpv();
+      if (!started) {
+        started = true;
+        writeStatus({ ok: true, firstPcmMs: Date.now() - startedAt, sampleRate });
+      }
+      mpv.stdin.write(pcm);
+      return;
+    }
+    if (type === "session.error") { fail(data?.error || "session_error"); return; }
+    if (type === "session.completed") {
+      if (settled) return;
+      settled = true;
+      try { mpv?.stdin?.end(); } catch {}
+      try { ws?.close(); } catch {}
+      cleanup();
+      process.exit(0);
+    }
+  };
+}
+process.on("SIGTERM", () => { settled = true; try { ws?.close(); } catch {}; try { mpv?.kill("SIGTERM"); } catch {}; cleanup(); process.exit(0); });
+process.on("SIGINT", () => process.emit("SIGTERM"));
+connect(0);`;
   }
-};`;
-  }
-  async function tryCloudNodeWebSocketFallback(payload, token) {
+  async function tryCloudNodeWebSocketFallback(payload, token, wsCandidates = null) {
+    var _a5;
     if (!(utils == null ? void 0 : utils.exec) || !(file == null ? void 0 : file.write)) {
       return { ok: false, error: "node_bridge_unavailable" };
     }
     const tmpToken = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
     const inputPath = `/tmp/polyscript_cloud_tts_input_${tmpToken}.json`;
     const helperPath = `/tmp/polyscript_cloud_tts_bridge_${tmpToken}.cjs`;
-    const wavPath = `/tmp/polyscript_cloud_tts_bridge_${tmpToken}.wav`;
+    const statusPath = `/tmp/polyscript_cloud_tts_bridge_${tmpToken}.status.json`;
+    const pidPath = `/tmp/polyscript_cloud_tts_bridge_${tmpToken}.pid`;
     try {
-      file.write(inputPath, JSON.stringify({ token, baseUrl: polyscriptBaseUrl, payload, wavPath }));
+      const wsUrls = Array.isArray(wsCandidates) && wsCandidates.length ? wsCandidates : buildCloudStreamWebsocketCandidates(token);
+      file.write(inputPath, JSON.stringify({ token, payload, wsUrls, statusPath, pidPath }));
       file.write(helperPath, buildCloudNodeBridgeScript());
-      const command = `PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; node ${shellQuote(helperPath)} ${shellQuote(inputPath)}`;
+      const command = `PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; node ${shellQuote(helperPath)} ${shellQuote(inputPath)} >/dev/null 2>&1 &`;
       await utils.exec("/bin/sh", ["-lc", command]);
-      const played = await playCloudAudioFile(wavPath);
-      if (!played) {
-        return { ok: false, error: "node_bridge_play_failed" };
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        await sleep(100);
+        if (!((_a5 = file.exists) == null ? void 0 : _a5.call(file, statusPath))) continue;
+        const status = parseJsonPayload(file.read(statusPath));
+        if (status == null ? void 0 : status.ok) {
+          activeCloudPcmBridgePidPath = pidPath;
+          return { ok: true, firstPcmMs: Number(status.firstPcmMs) || null };
+        }
+        if (status == null ? void 0 : status.error) {
+          return { ok: false, error: String(status.error) };
+        }
       }
-      return { ok: true };
+      return { ok: false, error: "node_bridge_start_timeout" };
     } catch (error) {
       return { ok: false, error: String((error == null ? void 0 : error.message) || error || "node_bridge_failed") };
     } finally {
       try {
-        await utils.exec("/bin/rm", ["-f", inputPath, helperPath]);
+        await utils.exec("/bin/rm", ["-f", helperPath, statusPath]);
       } catch {
       }
     }
@@ -3988,7 +4676,7 @@ ws.onmessage = (event) => {
     }
   }
   async function speakTextCloud(text, settings) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
     if (!http) return { ok: false, reason: "http_unavailable", message: "POLYSCRIPT: Cloud TTS unavailable (HTTP unavailable), using fallback" };
     const fail = (reason, message, extra = {}) => ({ ok: false, reason, message, ...extra });
     const token = await getValidPolyscriptToken();
@@ -4064,8 +4752,8 @@ ws.onmessage = (event) => {
       const streamingToken = await getValidPolyscriptToken();
       const effectiveToken = streamingToken || token;
       if (typeof WebSocket === "undefined") {
-        const nodeBridge = await tryCloudNodeWebSocketFallback(payload, effectiveToken);
-        if (nodeBridge.ok) {
+        const nodeBridge2 = await tryCloudNodeWebSocketFallback(payload, effectiveToken);
+        if (nodeBridge2.ok) {
           void postTelemetryEvent("tts.stream.success", {
             feature: "tts_stream",
             outcome: "success_node_ws_bridge",
@@ -4112,7 +4800,7 @@ ws.onmessage = (event) => {
           "websocket_unavailable",
           "POLYSCRIPT: Cloud TTS unavailable (cloud playback bridge and fallback audio failed), using fallback",
           {
-            nodeBridgeError: nodeBridge.error || "",
+            nodeBridgeError: nodeBridge2.error || "",
             error: httpFallback.error || "HTTP fallback failed.",
             generatedFallbackError: generatedFallback2.error || ""
           }
@@ -4121,6 +4809,21 @@ ws.onmessage = (event) => {
       const wsCandidates = buildCloudStreamWebsocketCandidates(streamingToken || token, sessionData);
       if (!wsCandidates.length) {
         return fail("stream_url_missing", "POLYSCRIPT: Cloud TTS unavailable (stream URL missing), using fallback");
+      }
+      const nodeBridge = await tryCloudNodeWebSocketFallback(payload, effectiveToken, wsCandidates);
+      if (nodeBridge.ok) {
+        void postTelemetryEvent("tts.stream.success", {
+          feature: "tts_stream",
+          outcome: "success_pcm_mpv",
+          properties: {
+            source: "polyplugin",
+            language: language || null,
+            voice_name: voiceName,
+            first_pcm_ms: (_a5 = nodeBridge.firstPcmMs) != null ? _a5 : null,
+            elapsed_ms: Date.now() - startedAt
+          }
+        });
+        return { ok: true, reason: "success_pcm_mpv" };
       }
       const streamed = await streamCloudSynthesisToWavBase64(payload, effectiveToken, wsCandidates);
       const played = await playCloudAudioBase64(streamed.audioBase64);
@@ -4132,10 +4835,10 @@ ws.onmessage = (event) => {
             source: "polyplugin",
             language: language || null,
             voice_name: voiceName,
-            ttfb_ms: (_b = (_a5 = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _a5.ttfbMs) != null ? _b : null,
-            elapsed_ms: (_d = (_c = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _c.elapsedMs) != null ? _d : Date.now() - startedAt,
-            chunks: (_f = (_e = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _e.chunkCount) != null ? _f : null,
-            audio_bytes: (_h = (_g = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _g.audioBytes) != null ? _h : null
+            ttfb_ms: (_c = (_b = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _b.ttfbMs) != null ? _c : null,
+            elapsed_ms: (_e = (_d = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _d.elapsedMs) != null ? _e : Date.now() - startedAt,
+            chunks: (_g = (_f = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _f.chunkCount) != null ? _g : null,
+            audio_bytes: (_i = (_h = streamed == null ? void 0 : streamed.metrics) == null ? void 0 : _h.audioBytes) != null ? _i : null
           }
         });
         return { ok: true, reason: "success" };
@@ -4219,6 +4922,14 @@ ws.onmessage = (event) => {
     try {
       utils.exec("/usr/bin/killall", ["afplay"]);
     } catch {
+    }
+    if (activeCloudPcmBridgePidPath) {
+      const pidPath = activeCloudPcmBridgePidPath;
+      activeCloudPcmBridgePidPath = "";
+      try {
+        utils.exec("/bin/sh", ["-c", `if [ -f ${shellQuote(pidPath)} ]; then /bin/kill -TERM "$(/bin/cat ${shellQuote(pidPath)})" 2>/dev/null || true; fi; /bin/rm -f ${shellQuote(pidPath)}`]);
+      } catch {
+      }
     }
     try {
       const settings = getTtsSettings();
@@ -5377,7 +6088,7 @@ ws.onmessage = (event) => {
     } else {
       menu.addItem(
         menu.item("Sign In...", async () => {
-          await startDeviceLogin({ skipPrompt: false });
+          await startDeviceLogin({ skipPrompt: true });
         })
       );
     }
@@ -6487,11 +7198,12 @@ ws.onmessage = (event) => {
       return;
     }
     if (hasExactSubtitleTimeline()) {
+      maybeStartExactTimelineFullFileTranslation("prefetch");
+      if (translatingFile) return;
       void ensureExactTimelineTranslationWindow(0).catch(() => {
       });
       void prefetchSecondarySubtitleWindow(0, EXACT_TIMELINE_WINDOW_LOOKAHEAD).catch(() => {
       });
-      maybeStartExactTimelineFullFileTranslation("prefetch");
       return;
     }
     const count = Math.min(PREFETCH_INITIAL_COUNT, subtitleEntries.length);
@@ -6508,6 +7220,7 @@ ws.onmessage = (event) => {
   function prefetchExactTimelineTranslations(activeEntry, reason = "playback") {
     if (!hasExactSubtitleTimeline()) return;
     if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return;
+    if (translatingFile) return;
     const anchorIndex = Number(activeEntry == null ? void 0 : activeEntry.index);
     if (!Number.isFinite(anchorIndex) || anchorIndex < 0 || anchorIndex >= subtitleEntries.length) return;
     const entry = activeEntry == null ? void 0 : activeEntry.entry;
@@ -6661,6 +7374,7 @@ ws.onmessage = (event) => {
   }
   async function prefetchSecondarySubtitleWindow(anchorIndex, count = EXACT_TIMELINE_WINDOW_LOOKAHEAD) {
     var _a5, _b;
+    if (translatingFile) return false;
     const target = getSecondaryTargetLang();
     if (!target || !Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
     if (normalizeSubtitleComparisonText(target) === normalizeSubtitleComparisonText(getEffectiveTargetLang())) return false;
@@ -6680,7 +7394,7 @@ ws.onmessage = (event) => {
       const texts = batch.map((item) => item.source.replace(/\n/g, " <|ps_line|> "));
       const translated = await translateBatch(texts, target);
       batch.forEach((item, index) => {
-        const restored = String(translated[index] || "").replace(/\s*<\|ps_line\|>\s*/g, "\n").trim();
+        const restored = restoreLineBreaks(translated[index]).trim();
         secondaryTranslationCache.set(item.key, restored || item.source);
       });
       return true;
@@ -6722,7 +7436,7 @@ ws.onmessage = (event) => {
     return true;
   }
   async function ensureExactTimelineTranslationWindow(anchorIndex) {
-    if (!hasExactSubtitleTimeline() || usingFullFileTranslation || usingNativeTargetSubs) return false;
+    if (translatingFile || !hasExactSubtitleTimeline() || usingFullFileTranslation || usingNativeTargetSubs) return false;
     if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
     if (!Number.isFinite(Number(anchorIndex)) || anchorIndex < 0 || anchorIndex >= subtitleEntries.length) return false;
     const windowStart = Math.max(0, Number(anchorIndex) - 2);
@@ -6751,7 +7465,7 @@ ws.onmessage = (event) => {
         const translations = await translateBatch(batchTexts, effectiveTarget);
         if (generation !== exactTimelineWindowGeneration) return false;
         batch.forEach((entry, index) => {
-          const restored = String(translations[index] || "").replace(/\s*<\|ps_line\|>\s*/g, "\n").trim();
+          const restored = restoreLineBreaks(translations[index]).trim();
           entry.translatedContent = restored;
           if (entry.content && entry.translatedContent) {
             lineTranslationCache.set(entry.content, entry.translatedContent);
@@ -6783,8 +7497,17 @@ ws.onmessage = (event) => {
       }
     }
   }
+  var PS_LINE_PLACEHOLDER = "<|ps_line|>";
+  var PS_LINE_PLACEHOLDER_PATTERN = new RegExp(
+    "\\s*" + PS_LINE_PLACEHOLDER.split("").map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*") + "\\s*",
+    "gi"
+  );
+  function restoreLineBreaks(text) {
+    return String(text || "").replace(PS_LINE_PLACEHOLDER_PATTERN, "\n");
+  }
   var translitTokensCache = /* @__PURE__ */ new Map();
-  var TRANSLIT_CACHE_FILE = "@data/translit-cache-v1.json";
+  var TRANSLIT_CACHE_FILE = "@data/translit-cache-v2.json";
+  var translitCacheLang = null;
   var TRANSLIT_CACHE_LIMITS = { translit: 5e3, tokens: 3e3, dict: 500 };
   var translitCacheSaveTimer = null;
   function trimMapToLimit(map, limit) {
@@ -6800,6 +7523,7 @@ ws.onmessage = (event) => {
       const raw = file.read(TRANSLIT_CACHE_FILE);
       if (!raw) return;
       const data = JSON.parse(raw);
+      translitCacheLang = typeof data.lang === "string" ? data.lang : null;
       for (const [k, v] of Object.entries(data.translit || {})) {
         if (typeof v === "string" && v) translitCache.set(k, v);
       }
@@ -6821,7 +7545,7 @@ ws.onmessage = (event) => {
       trimMapToLimit(translitCache, TRANSLIT_CACHE_LIMITS.translit);
       trimMapToLimit(translitTokensCache, TRANSLIT_CACHE_LIMITS.tokens);
       trimMapToLimit(dictCache, TRANSLIT_CACHE_LIMITS.dict);
-      const data = { translit: {}, tokens: {}, dict: {} };
+      const data = { lang: String(translitCacheLang || ""), translit: {}, tokens: {}, dict: {} };
       for (const [k, v] of translitCache) {
         if (typeof v === "string" && v) data.translit[k] = v;
       }
@@ -6844,19 +7568,65 @@ ws.onmessage = (event) => {
   loadPersistedTranslitCaches();
   function currentTransliterationLang() {
     try {
+      if (!usingNativeTargetSubs) {
+        const target = normalizeLangForSubtitleMatch(getEffectiveTargetLang() || "");
+        if (target) return target;
+      }
       const track = getSelectedSubTrack();
-      const lang = normalizeLangForSubtitleMatch((track == null ? void 0 : track.lang) || (track == null ? void 0 : track.language) || "");
+      const lang = normalizeLangForSubtitleMatch(
+        (track == null ? void 0 : track.lang) || (track == null ? void 0 : track.language) || getTrackLanguageHint(track) || ""
+      );
       return lang || "auto";
     } catch (_) {
       return "auto";
     }
   }
+  function ensureTranslitCacheMatchesLanguage() {
+    const lang = String(currentTransliterationLang() || "");
+    if (translitCacheLang === lang) return;
+    if (translitCacheLang !== null) {
+      console.log(`POLYSCRIPT: Reading language changed (${translitCacheLang} -> ${lang}); clearing cached readings.`);
+      translitCache.clear();
+      translitTokensCache.clear();
+      translitPending.clear();
+    }
+    translitCacheLang = lang;
+  }
+  function isKoreanReadingLanguage(language = currentTransliterationLang()) {
+    const normalized = normalizeLangForSubtitleMatch(language || "");
+    return normalized === "ko" || normalized.startsWith("ko-");
+  }
+  function getLocalKoreanRomanization(text) {
+    const value = String(text || "").trim();
+    if (!value || !/[\p{Script=Hangul}]/u.test(value)) return "";
+    try {
+      const romanized = romanize(value, {
+        usePronunciationRules: true,
+        useHyphen: true
+      });
+      return String(romanized || "").trim();
+    } catch (error) {
+      console.log(`POLYSCRIPT-WARN: Local Korean romanization failed: ${String((error == null ? void 0 : error.message) || error)}`);
+      return "";
+    }
+  }
   async function fetchTransliterationBatch(texts) {
+    ensureTranslitCacheMatchesLanguage();
     const wanted = Array.from(new Set((texts || []).map((t) => String(t || "")).filter(Boolean))).filter((t) => !translitTokensCache.has(t) && !translitPending.has(t)).slice(0, 40);
     if (!wanted.length) return;
     wanted.forEach((t) => translitPending.add(t));
     let anyStored = false;
     try {
+      if (isKoreanReadingLanguage()) {
+        wanted.forEach((text) => {
+          const reading = getLocalKoreanRomanization(text);
+          if (!reading) return;
+          translitTokensCache.set(text, [{ t: text, r: reading }]);
+          translitCache.set(normalizeWord(text), reading);
+          anyStored = true;
+        });
+        if (anyStored) return;
+      }
       try {
         const base = String(polyscriptBaseUrl || DEFAULT_POLYSCRIPT_BASE_URL).replace(/\/+$/, "");
         const resp = await authedPost(`${base}/api/transcript/transliterate`, {
@@ -7254,6 +8024,23 @@ ws.onmessage = (event) => {
     if (!shouldLookup(key)) return;
     dictPending.add(key);
     try {
+      if (isKoreanReadingLanguage()) {
+        const [translation, morphology2] = await Promise.all([
+          translateTextGoogle(key, DICT_LANG, "ko"),
+          fetchMorphologyAssist(key)
+        ]);
+        const info2 = {
+          translation: String(translation || "").trim(),
+          translit: getLocalKoreanRomanization(key),
+          dictionary: [],
+          morphology: morphology2 || null
+        };
+        info2.dictionary = mergeDictionaryEntries(info2.dictionary, morphologyDefinitionsToDictionaryEntries(morphology2));
+        dictCache.set(key, info2);
+        if (info2.translit) translitCache.set(key, info2.translit);
+        scheduleTranslitCacheSave();
+        return;
+      }
       const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=t&dt=rm&dt=md&dt=ex&q=${encodeURIComponent(key)}`;
       const [translationResp, morphology] = await Promise.all([
         safeHttpGet(url),
@@ -7485,7 +8272,8 @@ Only output the transformed text, nothing else.`,
       const now = Date.now();
       if ((llmMode === "translate" || llmMode === "custom" || llmMode === "explainCulture") && now - lastMissingLoginOsdAt > 3e4) {
         lastMissingLoginOsdAt = now;
-        core.osd("POLYSCRIPT: LLM mode requires sign-in. Use Sign In in panel.", 2500);
+        const blocked = getLangLabel(getEffectiveTargetLang()) || getEffectiveTargetLang();
+        core.osd(`POLYSCRIPT: ${blocked} subtitles need Sign In (Polyscript Panel -> Account).`, 4e3);
       }
       void postTelemetryEvent("llm.request_failed", {
         level: "warning",
@@ -7539,25 +8327,75 @@ Only output the transformed text, nothing else.`,
     });
     return String(content || "");
   }
-  async function translateTextGoogle(text, target) {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(target)}&dt=t&q=${encodeURIComponent(text)}`;
-    const resp = await safeHttpGet(url);
-    const data = resp.data;
-    let translation = "";
-    if (data && data[0]) {
-      data[0].forEach((seg) => {
-        if (seg[0]) translation += seg[0];
-      });
+  function describeTranslationError(error) {
+    if (!error) return "unknown error";
+    if (typeof error === "string") return error;
+    const fields = ["message", "localizedDescription", "description", "code", "statusCode", "status"];
+    const details = fields.map((field) => {
+      var _a5;
+      return `${field}=${String((_a5 = error[field]) != null ? _a5 : "").trim()}`;
+    }).filter((field) => !field.endsWith("="));
+    if (details.length) return details.join(", ");
+    try {
+      const encoded = JSON.stringify(error);
+      if (encoded && encoded !== "{}") return encoded;
+    } catch (_) {
     }
-    return translation || text;
+    return String(error);
   }
-  async function translateTextLLM(text, target) {
-    const prompt = LLM_PROMPTS.translate(text, target);
-    const messages = [
-      { role: "system", content: prompt.system },
-      { role: "user", content: prompt.user }
-    ];
-    return callPolyscriptLLM(messages, { temperature: 0.3 });
+  async function translateTextGoogleRelay(text, target, source = "auto") {
+    const base = String(polyscriptBaseUrl || DEFAULT_POLYSCRIPT_BASE_URL).replace(/\/+$/, "");
+    const relay = await safeHttpPost(`${base}/api/transcript/translate/free`, {
+      headers: { "Content-Type": "application/json" },
+      data: { texts: [String(text || "")], source_lang: source || "auto", target_lang: target }
+    });
+    const payload = typeof (relay == null ? void 0 : relay.data) === "object" && (relay == null ? void 0 : relay.data) ? relay.data : parseJsonPayload((relay == null ? void 0 : relay.data) || (relay == null ? void 0 : relay.text));
+    const translated = Array.isArray(payload == null ? void 0 : payload.translations) ? String(payload.translations[0] || "").trim() : "";
+    if (Number(relay == null ? void 0 : relay.statusCode) >= 200 && Number(relay == null ? void 0 : relay.statusCode) < 300 && translated) {
+      return translated;
+    }
+    throw new Error(`Free translation relay returned HTTP ${(relay == null ? void 0 : relay.statusCode) || "unknown"}`);
+  }
+  async function translateTextGoogle(text, target, source = "auto") {
+    const remainingCooldown = googleTranslationCooldownUntil - Date.now();
+    if (remainingCooldown > 0) {
+      throw new Error(`Google Translate is temporarily rate-limited; retry in ${Math.ceil(remainingCooldown / 1e3)}s`);
+    }
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(source || "auto")}&tl=${encodeURIComponent(target)}&dt=t&q=${encodeURIComponent(text)}`;
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const resp = await safeHttpGet(url);
+        const status = Number(resp == null ? void 0 : resp.statusCode);
+        if (Number.isFinite(status) && status >= 400) {
+          throw new Error(`Google Translate returned HTTP ${status}`);
+        }
+        const data = typeof (resp == null ? void 0 : resp.data) === "string" ? parseJsonPayload(resp.data) : (resp == null ? void 0 : resp.data) || parseJsonPayload(resp == null ? void 0 : resp.text);
+        let translation = "";
+        if (Array.isArray(data == null ? void 0 : data[0])) {
+          data[0].forEach((seg) => {
+            if (seg == null ? void 0 : seg[0]) translation += seg[0];
+          });
+        }
+        if (translation.trim()) return translation;
+        throw new Error("Google Translate returned no translated text");
+      } catch (error) {
+        lastError = error;
+        if (/\b429\b/.test(describeTranslationError(error))) break;
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+      }
+    }
+    try {
+      return await translateTextGoogleRelay(text, target, source);
+    } catch (relayError) {
+      if (/\b429\b/.test(describeTranslationError(lastError)) || /\b429\b|\b502\b/.test(describeTranslationError(relayError))) {
+        googleTranslationCooldownUntil = Date.now() + GOOGLE_TRANSLATION_COOLDOWN_MS;
+        notifyTranslationFallback("POLYSCRIPT: Google is temporarily rate-limited; showing original subtitles.");
+      }
+      throw new Error(
+        `Google Translate failed: ${describeTranslationError(lastError)}; relay: ${describeTranslationError(relayError)}`
+      );
+    }
   }
   function buildNumberedInput(texts, startIndex = 0) {
     return texts.map((t, i) => `[${i + startIndex}] ${t}`).join("\n");
@@ -7637,7 +8475,22 @@ Only output the transformed text, nothing else.`,
     const result = await callPolyscriptLLM(messages, { temperature: llmTemperature });
     const parsed = parseNumberedOutput(result, 1, 0);
     const fallback = String(result || "").trim();
-    return parsed[0] || fallback || text;
+    const translated = parsed[0] || fallback;
+    if (!translated) {
+      llmEmptyTranslations += 1;
+      if (llmEmptyTranslations === 1 || llmEmptyTranslations % 25 === 0) {
+        console.log(
+          `POLYSCRIPT-WARN: LLM returned nothing for ${target}; showing the source instead (${llmEmptyTranslations} so far). Raw reply was ${String(result || "").length} chars.`
+        );
+        writeSubtitleDebugSnapshot("llm-empty-translation", {
+          target,
+          replyChars: String(result || "").length,
+          emptyCount: llmEmptyTranslations
+        });
+      }
+      return text;
+    }
+    return translated;
   }
   var shownTranslationFallbacks = /* @__PURE__ */ new Set();
   function notifyTranslationFallback(message) {
@@ -7788,9 +8641,9 @@ Only output the transformed text, nothing else.`,
     } else {
       const translatedText = String(exactEntry.translatedContent || "").trim();
       const cachedText = lineTranslationCache.get(sourceContent || entryContent);
-      currentText = translatedText || String(cachedText || "").trim();
+      currentText = translatedText || String(cachedText || "").trim() || sourceContent || entryContent;
       primaryReady = !!currentText;
-      if (!primaryReady && (sourceContent || entryContent)) {
+      if (!translatedText && !String(cachedText || "").trim() && (sourceContent || entryContent)) {
         translateLine(sourceContent || entryContent);
       }
     }
@@ -7913,7 +8766,7 @@ Only output the transformed text, nothing else.`,
     overlay.setContent(`<div class="ps-container"></div>`);
   }
   function ensureOverlayLoaded() {
-    if (overlayLoaded || !polyscriptEnabled) return;
+    if (overlayLoaded || !polyscriptEnabled || !iinaWindowLoaded) return;
     try {
       overlay.simpleMode();
       applyAppearanceSettings();
@@ -8142,11 +8995,38 @@ Only output the transformed text, nothing else.`,
       console.log(`POLYSCRIPT-ERROR: Polling failed: ${e.message}`);
     }
   }
+  var cachedTrackList = null;
+  var cachedTrackListAt = 0;
+  var TRACK_LIST_CACHE_MS = 1500;
+  function invalidateTrackListCache() {
+    cachedTrackList = null;
+    cachedTrackListAt = 0;
+  }
+  function readTrackList() {
+    const now = Date.now();
+    if (cachedTrackList && now - cachedTrackListAt < TRACK_LIST_CACHE_MS) return cachedTrackList;
+    try {
+      const tracks = typeof mpv.getNative === "function" ? mpv.getNative("track-list") : null;
+      if (Array.isArray(tracks)) {
+        cachedTrackList = tracks;
+        cachedTrackListAt = now;
+        return tracks;
+      }
+    } catch (_) {
+    }
+    return cachedTrackList || [];
+  }
   function getSelectedSubTrack() {
     try {
-      const tracks = mpv.getNative("track-list");
+      const tracks = readTrackList();
       if (Array.isArray(tracks)) {
-        return tracks.find((t) => t.type === "sub" && t.selected);
+        const selected = tracks.find((t) => t.type === "sub" && t.selected);
+        if (selected) return selected;
+        const sid = typeof (mpv == null ? void 0 : mpv.getString) === "function" ? String(mpv.getString("sid") || "") : "";
+        const sidNumber = Number(sid);
+        if (Number.isFinite(sidNumber)) {
+          return tracks.find((t) => t.type === "sub" && Number(t.id) === sidNumber) || null;
+        }
       }
     } catch {
     }
@@ -8154,7 +9034,7 @@ Only output the transformed text, nothing else.`,
   }
   function getSubtitleTrackById(id) {
     try {
-      const tracks = mpv.getNative("track-list");
+      const tracks = readTrackList();
       if (!Array.isArray(tracks)) return null;
       return tracks.find((t) => t && t.type === "sub" && Number(t.id) === Number(id)) || null;
     } catch {
@@ -8182,8 +9062,8 @@ Only output the transformed text, nothing else.`,
   function setPrimarySubtitleTrack(id) {
     const desiredId = id == null || id === "no" ? null : Number(id);
     try {
-      if (core == null ? void 0 : core.subtitle) {
-        core.subtitle.id = Number.isFinite(desiredId) ? desiredId : null;
+      if ((core == null ? void 0 : core.subtitle) && Number.isFinite(desiredId)) {
+        core.subtitle.id = desiredId;
       }
     } catch {
     }
@@ -8208,7 +9088,7 @@ Only output the transformed text, nothing else.`,
     const target = String(path || "").trim();
     if (!target) return null;
     try {
-      const tracks = mpv.getNative("track-list");
+      const tracks = readTrackList();
       if (!Array.isArray(tracks)) return null;
       return tracks.find((track) => {
         if (!track || track.type !== "sub") return false;
@@ -8224,7 +9104,7 @@ Only output the transformed text, nothing else.`,
   }
   function listSubtitleTracks() {
     try {
-      const tracks = mpv.getNative("track-list");
+      const tracks = readTrackList();
       if (!Array.isArray(tracks)) return [];
       return tracks.filter((t) => t && t.type === "sub" && typeof t.id === "number").filter((t) => {
         const title = String(t.title || "").toLowerCase();
@@ -8237,9 +9117,8 @@ Only output the transformed text, nothing else.`,
       return [];
     }
   }
-  var SUBTITLE_DEBUG_PATH = "/tmp/polyscript_subtitle_debug.jsonl";
+  var SUBTITLE_DEBUG_PREFIX = "/tmp/psdebug_";
   var SUBTITLE_DEBUG_MAX_LINES = 240;
-  var SUBTITLE_DEBUG_BUILD_MARKER = "auto-select-confirmation-2026-05-01-a";
   var SUBTITLE_DEBUG_ENABLED = false;
   var subtitleDebugLines = [];
   var subtitleDebugSequence = 0;
@@ -8262,32 +9141,21 @@ Only output the transformed text, nothing else.`,
   function writeSubtitleDebugSnapshot(reason, extra = {}) {
     if (!SUBTITLE_DEBUG_ENABLED) return;
     try {
-      const tracks = typeof mpv.getNative === "function" ? mpv.getNative("track-list") : [];
       const snapshot = {
         at: (/* @__PURE__ */ new Date()).toISOString(),
         reason: String(reason || ""),
-        sid: typeof mpv.getString === "function" ? mpv.getString("sid") : null,
-        secondarySid: typeof mpv.getString === "function" ? mpv.getString("secondary-sid") : null,
-        coreSubtitleId: (() => {
-          var _a5, _b;
-          try {
-            return (_b = (_a5 = core == null ? void 0 : core.subtitle) == null ? void 0 : _a5.id) != null ? _b : null;
-          } catch {
-            return null;
-          }
-        })(),
-        subVisibility: safeGetBoolean("sub-visibility"),
-        secondarySubVisibility: safeGetBoolean("secondary-sub-visibility"),
-        selected: sanitizeSubtitleTrackForDebug(getSelectedSubTrack()),
-        tracks: Array.isArray(tracks) ? tracks.filter((track) => track && track.type === "sub").map(sanitizeSubtitleTrackForDebug) : [],
-        autoPickSourceSubtitlesEnabled,
-        sourceTrackAutoSelectedForFile,
-        sourceTrackSelectionAttempts,
-        lastSourceSubId,
+        // What the reader asked for.
+        targetLang: getEffectiveTargetLang(),
+        llmCustomTarget,
+        translationProvider,
+        // How the plugin decided to answer, which is where the bugs live.
         usingNativeTargetSubs,
         usingFullFileTranslation,
-        targetLang: getEffectiveTargetLang(),
-        debugBuildMarker: SUBTITLE_DEBUG_BUILD_MARKER,
+        translatingFile,
+        polyscriptEnabled,
+        useNativeSubsWhenAvailable,
+        entries: Array.isArray(subtitleEntries) ? subtitleEntries.length : 0,
+        signedIn: !!polyscriptToken,
         ...extra
       };
       const line = JSON.stringify(snapshot);
@@ -8296,10 +9164,8 @@ Only output the transformed text, nothing else.`,
         subtitleDebugLines.shift();
       }
       subtitleDebugSequence += 1;
-      const safeReason = String(reason || "snapshot").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80);
-      file.write(`/tmp/polyscript_subtitle_debug_${String(subtitleDebugSequence).padStart(3, "0")}_${safeReason}.json`, `${line}
+      file.write(`${SUBTITLE_DEBUG_PREFIX}${String(subtitleDebugSequence).padStart(4, "0")}.json`, `${line}
 `);
-      console.log(`POLYSCRIPT: Subtitle debug snapshot ${reason} -> ${SUBTITLE_DEBUG_PATH}`);
     } catch (error) {
       console.log(`POLYSCRIPT-WARN: Subtitle debug snapshot failed: ${String((error == null ? void 0 : error.message) || error)}`);
     }
@@ -8399,9 +9265,8 @@ Only output the transformed text, nothing else.`,
       }
       const title = String(track.title || "").toLowerCase().trim();
       if (!title) continue;
-      const titleParts = title.split(/[^a-z\u00c0-\u024f\u0370-\u03ff]+/u).filter(Boolean);
-      const titleTokenSet = new Set(titleParts);
-      if ([...targetTokens].some((token) => token && (titleTokenSet.has(token) || title.includes(token)))) {
+      const standaloneLabel = title.replace(/^[\[\(\{\s]+|[\]\)\}\s]+$/g, "").trim();
+      if ([...targetTokens].some((token) => token && standaloneLabel === token)) {
         return track;
       }
     }
@@ -8445,6 +9310,10 @@ Only output the transformed text, nothing else.`,
     const effectiveTarget = getEffectiveTargetLang();
     if (!effectiveTarget) {
       writeSubtitleDebugSnapshot("try-native-target-no-target");
+      return false;
+    }
+    if (shouldUseLlmTranslation(effectiveTarget)) {
+      writeSubtitleDebugSnapshot("try-native-target-skipped-llm", { effectiveTarget });
       return false;
     }
     writeSubtitleDebugSnapshot("try-native-target-start", {
@@ -8837,7 +9706,7 @@ Only output the transformed text, nothing else.`,
   function getEmbeddedSubTrackIndexForTrack(track) {
     try {
       if (!track || track.external) return null;
-      const tracks = typeof mpv.getNative === "function" ? mpv.getNative("track-list") : null;
+      const tracks = readTrackList();
       if (Array.isArray(tracks)) {
         const embeddedSubs = tracks.filter((t) => t && t.type === "sub" && !t.external).sort((a, b) => Number(a.id) - Number(b.id));
         const position = embeddedSubs.findIndex((t) => Number(t.id) === Number(track.id));
@@ -9379,38 +10248,80 @@ ${e.content}
     if (shouldUseLlmTranslation(targetLang2)) {
       return translateBatchLLM(texts, targetLang2);
     }
-    const results = [];
     const chunks = sharedChunkTextsForGoogle(texts);
-    for (const chunk of chunks) {
-      const combinedTranslation = await translateText(chunk.combined, targetLang2);
-      const translatedTexts = sharedSplitBulkTranslation(
-        combinedTranslation,
-        SHARED_GT_SEPARATOR,
-        chunk.texts.length
-      );
-      results.push(...translatedTexts);
-    }
-    return results;
+    const results = new Array(chunks.length);
+    let nextChunk = 0;
+    const workerCount = Math.min(1, chunks.length);
+    const worker = async () => {
+      while (nextChunk < chunks.length) {
+        const index = nextChunk;
+        nextChunk += 1;
+        const chunk = chunks[index];
+        const combinedTranslation = await translateText(chunk.combined, targetLang2);
+        const translatedTexts = sharedSplitBulkTranslation(
+          combinedTranslation,
+          SHARED_GT_SEPARATOR,
+          chunk.texts.length
+        );
+        results[index] = chunk.texts.map((source, lineIndex) => translatedTexts[lineIndex] || source);
+        if (nextChunk < chunks.length) await new Promise((resolve) => setTimeout(resolve, 1100));
+      }
+    };
+    await Promise.all(Array.from({ length: workerCount }, worker));
+    return results.flat();
   }
   async function translatePreparedSubtitleEntries(entries, targetLang2) {
+    var _a5;
     const texts = entries.map((entry) => String((entry == null ? void 0 : entry.content) || "").replace(/\n/g, " <|ps_line|> "));
     if (!texts.length) return [];
-    if (!shouldUseLlmTranslation(targetLang2)) {
+    const viaLlm = shouldUseLlmTranslation(targetLang2);
+    writeSubtitleDebugSnapshot("translate-prepared", { lines: texts.length, viaLlm, targetLang: targetLang2 });
+    if (!viaLlm) {
       return translateBatch(texts, targetLang2);
     }
+    const CHUNK = 12;
+    const chunkStarts = [];
+    for (let start = 0; start < texts.length; start += CHUNK) chunkStarts.push(start);
+    const positionSeconds = Number((_a5 = mpv.getNumber) == null ? void 0 : _a5.call(mpv, "time-pos")) || 0;
+    const entryStart = (index) => {
+      const entry = entries[index];
+      const ms = Number(entry == null ? void 0 : entry.startMs);
+      return Number.isFinite(ms) ? ms / 1e3 : Number.MAX_SAFE_INTEGER;
+    };
+    chunkStarts.sort(
+      (a, b) => Math.abs(entryStart(a) - positionSeconds) - Math.abs(entryStart(b) - positionSeconds)
+    );
     const results = new Array(texts.length).fill("");
-    let nextIndex = 0;
-    const workerCount = Math.max(1, Math.min(PREPARED_SUBTITLE_LLM_CONCURRENCY, texts.length));
+    let nextChunk = 0;
+    let done = 0;
+    const workerCount = Math.max(1, Math.min(PREPARED_SUBTITLE_LLM_CONCURRENCY, chunkStarts.length));
     const worker = async () => {
-      while (nextIndex < texts.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        const text = texts[index];
+      while (nextChunk < chunkStarts.length) {
+        const which = nextChunk;
+        nextChunk += 1;
+        const start = chunkStarts[which];
+        const slice = texts.slice(start, start + CHUNK);
         try {
-          results[index] = await translateText(text, targetLang2);
+          const translated = await translateBatchLLM(slice, targetLang2);
+          slice.forEach((_, offset) => {
+            results[start + offset] = translated[offset] || "";
+          });
         } catch (error) {
-          console.log(`POLYSCRIPT-WARN: Prepared subtitle line translation failed at ${index}: ${String((error == null ? void 0 : error.message) || error)}`);
-          results[index] = "";
+          if (which === 0) {
+            writeSubtitleDebugSnapshot("translate-chunk-failed", {
+              start,
+              error: String((error == null ? void 0 : error.message) || error)
+            });
+          }
+          console.log(
+            `POLYSCRIPT-WARN: Prepared subtitle chunk at ${start} failed: ${String((error == null ? void 0 : error.message) || error)}`
+          );
+        }
+        done += 1;
+        if (done === 1 || done % 10 === 0 || done === chunkStarts.length) {
+          console.log(
+            `POLYSCRIPT: Translated ${Math.min(done * CHUNK, texts.length)}/${texts.length} lines into ${targetLang2} (from ${Math.round(positionSeconds)}s outwards).`
+          );
         }
       }
     };
@@ -9476,7 +10387,14 @@ ${e.content}
     syncNativeSubtitleVisibility();
   }
   async function translateCurrentSubtitleFile() {
-    if (translatingFile || !polyscriptEnabled) return;
+    var _a5, _b;
+    console.log(`POLYSCRIPT: Translation requested (enabled=${polyscriptEnabled}, active=${translatingFile}).`);
+    if (!polyscriptEnabled) return;
+    invalidateTrackListCache();
+    if (translatingFile) {
+      retranslateWhenFree = true;
+      return;
+    }
     if (tryUseNativeTargetSubtitles()) return;
     const jobId = ++currentTranslateJobId;
     let path = getSubtitleFilePath();
@@ -9494,6 +10412,7 @@ ${e.content}
       }
     }
     translatingFile = true;
+    writeSubtitleDebugSnapshot("translate-start", { path });
     core.osd("POLYSCRIPT: Translating subtitles...", 3e3);
     try {
       const raw = file.read(path);
@@ -9505,16 +10424,32 @@ ${e.content}
       const cachePath = buildPreparedSubtitleCachePath(getPreparedSubtitleTranslationKey(path, effectiveTarget));
       if (file.exists(cachePath)) {
         const cachedRaw = file.read(cachePath);
-        if (cachedRaw) {
+        writeSubtitleDebugSnapshot("translate-cache-hit", { cachePath });
+        if (cachedRaw && preparedTranslationLooksCorrupt(cachedRaw)) {
+          console.log("POLYSCRIPT: Prepared translation contains our own markers; discarding it and translating again.");
+          try {
+            (_a5 = file.delete) == null ? void 0 : _a5.call(file, cachePath);
+          } catch (_) {
+          }
+        } else if (cachedRaw) {
           const cachedEntries = parseSrt(cachedRaw).map((entry, index) => {
-            var _a5;
+            var _a6;
             return {
               ...entry,
-              sourceContent: String(((_a5 = entries[index]) == null ? void 0 : _a5.content) || "")
+              sourceContent: String(((_a6 = entries[index]) == null ? void 0 : _a6.content) || "")
             };
           });
           if (jobId !== currentTranslateJobId) return;
-          if (usePreparedOverlayTimeline) {
+          if (preparedTranslationIsUntranslated(cachedEntries, entries)) {
+            console.log(
+              "POLYSCRIPT: Prepared translation is the source text; discarding it and translating again."
+            );
+            writeSubtitleDebugSnapshot("translate-cache-untranslated", { cachePath });
+            try {
+              (_b = file.delete) == null ? void 0 : _b.call(file, cachePath);
+            } catch (_) {
+            }
+          } else if (usePreparedOverlayTimeline) {
             activatePreparedSubtitleTimeline(cachedEntries, sourceSelectionKey);
             core.osd("POLYSCRIPT: Loaded prepared translated timeline.", 2500);
           } else {
@@ -9528,13 +10463,24 @@ ${e.content}
       if (jobId !== currentTranslateJobId) return;
       translations.forEach((t, i) => {
         entries[i].sourceContent = entries[i].content;
-        const restored = String(t || "").replace(/\s*<\|ps_line\|>\s*/g, "\n").trim();
+        const restored = restoreLineBreaks(t).trim();
         entries[i].content = restored || entries[i].content;
       });
       enforceMinCueDuration(entries);
+      const untranslated = preparedTranslationIsUntranslated(
+        entries.map((entry) => ({ content: entry.content })),
+        entries.map((entry) => ({ content: entry.sourceContent }))
+      );
+      if (untranslated) {
+        console.log(
+          `POLYSCRIPT-WARN: Translation into ${effectiveTarget} came back as the source text; not caching it.`
+        );
+        writeSubtitleDebugSnapshot("translate-result-untranslated", { target: effectiveTarget });
+        core.osd(`POLYSCRIPT: ${effectiveTarget} translation failed \u2014 showing the original.`, 4e3);
+      }
       const translatedSrt = buildSrt(entries);
       const outPath = cachePath;
-      file.write(outPath, translatedSrt);
+      if (!untranslated) file.write(outPath, translatedSrt);
       const prevTrack = getSelectedSubTrack();
       const prevId = prevTrack && typeof prevTrack.id === "number" ? prevTrack.id : null;
       if (prevId != null) {
@@ -9544,16 +10490,32 @@ ${e.content}
       if (usePreparedOverlayTimeline) {
         activatePreparedSubtitleTimeline(entries, sourceSelectionKey);
         core.osd("POLYSCRIPT: Translated timeline ready.", 3e3);
-      } else {
+      } else if (!untranslated) {
         await activatePreparedSubtitleTrack(outPath, entries);
         core.osd("POLYSCRIPT: Translated subtitles loaded.", 3e3);
       }
+      writeSubtitleDebugSnapshot("translate-complete", {
+        path,
+        target: effectiveTarget,
+        translatedLines: entries.filter(
+          (entry) => normalizeSubtitleComparisonText(entry.content) !== normalizeSubtitleComparisonText(entry.sourceContent)
+        ).length
+      });
     } catch (e) {
       exactTimelineFullFileTranslationRequestKey = "";
-      console.log(`POLYSCRIPT-ERROR: Subtitle translation failed: ${e.message}`);
-      core.osd("POLYSCRIPT: Subtitle translation failed.", 3e3);
+      const error = describeTranslationError(e);
+      console.log(`POLYSCRIPT-ERROR: Subtitle translation failed: ${error}`);
+      writeSubtitleDebugSnapshot("translate-failed", { path, error });
+      core.osd(
+        /temporarily rate-limited/.test(error) ? "POLYSCRIPT: Google is temporarily rate-limited; showing original subtitles." : "POLYSCRIPT: Subtitle translation failed.",
+        3e3
+      );
     } finally {
       translatingFile = false;
+      if (retranslateWhenFree) {
+        retranslateWhenFree = false;
+        void Promise.resolve().then(() => translateCurrentSubtitleFile());
+      }
     }
   }
   function transcriptTextForLine(sourceText) {
@@ -9582,18 +10544,7 @@ ${e.content}
     const translatedText = String(entry.translatedContent || "").trim();
     if (translatedText) return translatedText;
     const cached = String(lineTranslationCache.get(sourceText) || "").trim();
-    return cached;
-  }
-  function hasAnyTranslatedTimelineEntries() {
-    if (!Array.isArray(subtitleEntries) || !subtitleEntries.length) return false;
-    if (usingFullFileTranslation || usingNativeTargetSubs) return true;
-    return subtitleEntries.some((entry) => {
-      const translated = String((entry == null ? void 0 : entry.translatedContent) || "").trim();
-      if (translated) return true;
-      const sourceText = String((entry == null ? void 0 : entry.sourceContent) || (entry == null ? void 0 : entry.content) || "");
-      const cached = lineTranslationCache.get(sourceText);
-      return !!String(cached || "").trim() && String(cached || "").trim() !== sourceText.trim();
-    });
+    return cached || sourceText;
   }
   function dedupeTranscriptRows(rows) {
     if (!Array.isArray(rows) || rows.length <= 1) return Array.isArray(rows) ? rows : [];
@@ -9703,10 +10654,6 @@ ${e.content}
   }
   function emitTranscriptEntries() {
     if (!subtitleEntries || !subtitleEntries.length) return;
-    if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
-      sendSidebarMessage("ps:transcript", { entries: [], hasSecondary: false });
-      return;
-    }
     const sortedEntries = [...subtitleEntries].sort((a, b) => {
       const aStart = Number(a == null ? void 0 : a.startMs);
       const bStart = Number(b == null ? void 0 : b.startMs);
@@ -9811,11 +10758,7 @@ ${e.content}
         if (hasExactSubtitleTimeline()) {
           maybeStartExactTimelineFullFileTranslation("transcript-load");
         }
-        if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
-          sendSidebarMessage("ps:transcript", { entries: [], hasSecondary: false });
-        } else {
-          emitTranscriptEntries();
-        }
+        emitTranscriptEntries();
         return;
       }
       ensureSentenceEntries().then((ok) => {
@@ -9823,11 +10766,7 @@ ${e.content}
           if (hasExactSubtitleTimeline()) {
             maybeStartExactTimelineFullFileTranslation("transcript-load");
           }
-          if (hasExactSubtitleTimeline() && !hasAnyTranslatedTimelineEntries()) {
-            sendSidebarMessage("ps:transcript", { entries: [], hasSecondary: false });
-          } else {
-            emitTranscriptEntries();
-          }
+          emitTranscriptEntries();
         } else {
           if (liveTranscriptEntries.length) {
             sendSidebarMessage("ps:transcript", {
@@ -9868,6 +10807,7 @@ ${e.content}
     startTranscriptTimePoll();
   }
   event.on("iina.file-loaded", () => {
+    invalidateTrackListCache();
     usingFullFileTranslation = false;
     usingNativeTargetSubs = false;
     clearSubtitleEntriesState();
@@ -9897,6 +10837,7 @@ ${e.content}
   });
   event.on("iina.window-loaded", () => {
     var _a5;
+    iinaWindowLoaded = true;
     buildMenu();
     ensureOverlayLoaded();
     syncNativeSubtitleVisibility();
@@ -9909,5 +10850,4 @@ ${e.content}
     emitSidebarSettings();
     maybeAutoRefreshAiStatus(true);
   });
-  ensureOverlayLoaded();
 })();
