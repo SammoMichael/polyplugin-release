@@ -307,6 +307,7 @@
       (function initPolyscriptTranslationHelpers(global) {
         const GOOGLE_TRANSLATE_SEPARATOR = "\n\u27EA\xA7\xA7\xA7PS99991\xA7\xA7\xA7\u27EB\n";
         const GOOGLE_TRANSLATE_URL_CAP = 1800;
+        const GOOGLE_TRANSLATE_CLIENT2 = "dict-chrome-ex";
         function trim(value) {
           return String(value == null ? "" : value).trim();
         }
@@ -349,7 +350,7 @@
           return GOOGLE_SOURCE_LANGS[base] || base || "auto";
         }
         function buildGoogleTranslateUrl(text, targetLang2, sourceLang) {
-          return `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(googleSourceLang(sourceLang))}&tl=${encodeURIComponent(targetLang2 || "en")}&dt=t&dt=rm&q=${encodeURIComponent(String(text || ""))}`;
+          return `https://translate.googleapis.com/translate_a/single?client=${GOOGLE_TRANSLATE_CLIENT2}&sl=${encodeURIComponent(googleSourceLang(sourceLang))}&tl=${encodeURIComponent(targetLang2 || "en")}&dt=t&dt=rm&q=${encodeURIComponent(String(text || ""))}`;
         }
         function parseGoogleTranslatePayload(text) {
           try {
@@ -969,6 +970,7 @@
     utils,
     preferences
   } = iina;
+  var GOOGLE_TRANSLATE_CLIENT = "dict-chrome-ex";
   console.log("Polyscript Plugin: Restoring to the last working state.");
   var lastSubtitleText = "";
   var subtitleChangeSerial = 0;
@@ -7653,7 +7655,7 @@ connect(0);`;
       }
       for (const text of wanted) {
         try {
-          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=rm&q=${encodeURIComponent(text)}`;
+          const url = `https://translate.googleapis.com/translate_a/single?client=${GOOGLE_TRANSLATE_CLIENT}&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=rm&q=${encodeURIComponent(text)}`;
           const res = await safeHttpGet(url);
           const data = res.data;
           let translit = "";
@@ -8041,7 +8043,7 @@ connect(0);`;
         scheduleTranslitCacheSave();
         return;
       }
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=t&dt=rm&dt=md&dt=ex&q=${encodeURIComponent(key)}`;
+      const url = `https://translate.googleapis.com/translate_a/single?client=${GOOGLE_TRANSLATE_CLIENT}&sl=${encodeURIComponent(currentTransliterationLang())}&tl=${encodeURIComponent(DICT_LANG)}&dt=t&dt=rm&dt=md&dt=ex&q=${encodeURIComponent(key)}`;
       const [translationResp, morphology] = await Promise.all([
         safeHttpGet(url),
         fetchMorphologyAssist(key)
@@ -8361,7 +8363,7 @@ Only output the transformed text, nothing else.`,
     if (remainingCooldown > 0) {
       throw new Error(`Google Translate is temporarily rate-limited; retry in ${Math.ceil(remainingCooldown / 1e3)}s`);
     }
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(source || "auto")}&tl=${encodeURIComponent(target)}&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `https://translate.googleapis.com/translate_a/single?client=${GOOGLE_TRANSLATE_CLIENT}&sl=${encodeURIComponent(source || "auto")}&tl=${encodeURIComponent(target)}&dt=t&q=${encodeURIComponent(text)}`;
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
